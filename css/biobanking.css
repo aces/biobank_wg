@@ -6,13 +6,13 @@
     width: 20%;
 }
 .form-inline.form-control.biobankingAddSpecimen[disabled] {
-    width: 20%;
-    background-color: #053665;
-    text-align: center;
-    color: white;
-
+    
 }
 
 .form-inline.form-control.biobankingAddSpecimenHeader {
     background-color: #1c70b6;
+    width: 20%;
+    background-color: #053665;
+    text-align: center;
+    color: white;
 }

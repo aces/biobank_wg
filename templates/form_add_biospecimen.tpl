@@ -27,27 +27,33 @@ $(function(){
 function consentRequired() {
     var x = document.getElementsByName("participant_consent")[0];
     if (x.value == "Yes") {
-        $("#save").removeClass("disabled");
+        $("#save").prop("disabled", false);
         $("#consent_alert").hide();
     }
     if (x.value != "Yes") {
-        $("#save").addClass("disabled");
+        $("#save").prop("disabled", true);
         $("#consent_alert").show();
     }
 }
 
-function sampleRequired() {
-    var x = document.getElementsByName("nb_samples")[0];
-    if (x.value == "1") {
-        $("#save").removeClass("disabled");
-        $("#sample_alert").hide();
-    }
-    if (x.value != "1") {
-        $("#save").addClass("disabled");
-        $("#sample_alert").show();
-    }
-}
+function sampleRequired(specimenType, fieldNames) {
+    var fieldNames = [
+        "biospecimen_id_", "status_id_", "collection_date_", "collection_ra_id_",
+        "time_", "freezer_id_", "box_id_", "box_coordinates_", "collection_notes_"]
+    var fieldNamesLength = fieldNames.length;
 
+        var x = document.getElementsByName("nb_samples_" + specimenType)[0];
+
+        for (var i = 0; i < fieldNamesLength; i++) {
+            if (x.value == "1") {
+                $(document.getElementsByName(fieldNames[i] + specimenType)[0]).prop("disabled", false);
+            }
+            if (x.value == "0") {
+                $(document.getElementsByName(fieldNames[i] + specimenType)[0]).prop("disabled", true);
+            }
+        }
+
+}
 </script>
 
 
@@ -342,7 +348,7 @@ function sampleRequired() {
 
     <div class="row form-group form-inline">
         <div class="col-sm-2">
-            <input id="save" class="btn btn-sm btn-primary col-xs-12 disabled" name="fire_away" value="Save" type="submit" />
+            <input id="save" class="btn btn-sm btn-primary col-xs-12" name="fire_away" value="Save" type="submit" disabled />
         </div>
         <div class="col-sm-2">
             <input class="btn btn-sm btn-primary col-xs-12" value="Reset" type="reset" />
