@@ -3,7 +3,7 @@
 <script type="text/javascript">
     $(document).ready(function(){
         $("#cand").DynamicTable({ "freezeColumn" : "pscid" });
-        
+
         $('input[name=dob_1]').datepicker({
   			yearRange: 'c-70:c',
             dateFormat: 'dd-M-yy',
@@ -19,19 +19,19 @@
 	function validateForm() {
 		var pscids = $("textarea[name='pscId_1']").val();
 		if(!pscids.match(/^\s*([\w-]+)?(\s+[\w-]+)*\s*$/)) {
-			document.getElementById('error_message').innerHTML = 
+			document.getElementById('error_message').innerHTML =
 			    '<font color="red">&nbsp;&nbsp;&nbsp;Invalid PSCIDs. Please enter a list of pscids separated by spaces or leave this field blank</font>';
 			return false;
-		} 
-		
+		}
+
 		var dob = $("input[name='dob_1']").val();
-		if(!dob.match(/^\s*$/) 
+		if(!dob.match(/^\s*$/)
 		   && !dob.match(/^\s*(\d|\d\d)-(Jan|Feb|Mar|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d\d\d\d\s*$/i)) {
-			document.getElementById('error_message').innerHTML = 
-			    '<font color="red">&nbsp;&nbsp;&nbsp;The Date of birth should be in the form "dd-AbbreviatedMonth-YYYY" (e.g 03-Jul-2011, 11-Nov-2013, etc...)</font>';
+			document.getElementById('error_message').innerHTML =
+			    '<font color="red">&nbsp;&nbsp;&nbsp;The Date of  birth should be in the form "dd-AbbreviatedMonth-YYYY" (e.g 03-Jul-2011, 11-Nov-2013, etc...)</font>';
 			return false;
-		} 
-		
+		}
+
 		document.getElementById('error_message').innerHTML = '';
 		return true;
 	}
@@ -40,11 +40,11 @@
 </script>
 
 <div class="row">
-    <div id="tabs"> 
+    <div id="tabs">
         <ul class="nav nav-tabs">
             <li class="statsTab active"><a class="statsTabLink" id="onLoad"><strong>Search by PSCID</strong></a></li>
             <li class="statsTab"><a class="statsTabLink" href="{$baseurl}/biobanking/?submenu=biospecimen_search&reset=true">Search by Specimen</a></li>
-            <li class="statsTab"><a class="statsTabLink" href="{$baseurl}/biobanking/?submenu=add_biospecimen">Add Specimen</a></li>
+            <li class="statsTab"><a class="statsTabLink" href="{$baseurl}/biobanking/?submenu=addBiospecimen">Add Specimen</a></li>
         </ul>
         <br>
     </div>
@@ -54,7 +54,7 @@
 <div class="col-sm-12">
 <div class="panel panel-primary">
     <div class="panel-heading" onclick="hideFilter(this)">
-        Selection Filter 
+        Selection Filter
         <!--Note: this label is currently hidden (display:none) -->
         <label class="advancedOptions" id="advanced-label" style="display:none">(Advanced Options)</label>
         <span class="glyphicon arrow glyphicon-chevron-up pull-right"></span>

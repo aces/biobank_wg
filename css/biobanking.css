@@ -1,0 +1,18 @@
+.table-striped {
+    background-color: #C4E3FE;
+}
+
+.form-inline.form-control.biobankingAddSpecimen {
+    width: 20%;
+}
+.form-inline.form-control.biobankingAddSpecimen[disabled] {
+
+}
+
+.form-inline.form-control.biobankingAddSpecimenHeader {
+    background-color: #1c70b6;
+    width: 20%;
+    background-color: #053665;
+    text-align: center;
+    color: white;
+}

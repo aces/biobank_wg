@@ -97,8 +97,8 @@ class NDB_Menu_biospecimen_collection extends NDB_Menu
                 LEFT JOIN biobanking_ra br ON (b.collection_ra_id=br.id)
                 WHERE b.id=:id",
                 $params = array('id' => $this->biospecimen_id)
-                );
-        $this->tpl_data['info'] = $info;
+                );        
+$this->tpl_data['info'] = $info;
     }
 }
 ?>
