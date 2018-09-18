@@ -101,7 +101,6 @@ $stid = oci_parse($orConn, $orQuery);
 oci_execute($stid);
 while (($tmRow = oci_fetch_assoc($stid)) != false) {
     $candidate = array();
-    $session   = array();
 
     // check if sample already exist in Loris
     $sampleExist = $DB->pselectOne(
@@ -133,26 +132,73 @@ while (($tmRow = oci_fetch_assoc($stid)) != false) {
             array(':candID' => $candidate['PSCID'])
         );
         if (!$session['ID']) {
-            $session['ID'] = insertSession($tmRow);
+            $session['ID'] = insertSession($tmRow, $candidate['CandID'], $userID);
         }
-        
-
         insertSample($tmRow);
     }
 
     
 
-    $candidate['active'] = ""; //need to find in Oracle
-    $candidate['Hardcopy-request'] = 'N'; //default
-    $candidate['MRIQCStatus'] = '';
-    $candidate['MRIQCPending'] = 'N';
 
-    $session['PSCID'] = $candidate['PSCID']; 
-    $session['CenterID'] = ""; // need to set to specific
-    $session['Active'] = ""; //need to find in Oracle
-    $session['UserID'] = ""; // from user running the script
 
 }
 
+function insertCandidate(array $tmRow, array &$candidate) : bool
+{
+    $candidate['active'] = 'Y'; 
+    $candidate['CenterID'] = ''; 
+    $candidate['Testdate'] = ''; // from TM
+    $candidate['Entity_type'] = 'Human';
+
+}
+
+function insertSession(array $tmRow, $candID, $userID) : bool
+{
+    $session = array();
+    $session['CandID'] = $candID; 
+    $session['CenterID'] = ""; // need to set to specific
+    $session['Active'] = 'Y'; 
+    $session['UserID'] = $userID;
+    $session['Hardcopy-request'] = '-';
+    $session['MRIQCStatus'] = '';
+    $session['MRIQCPending'] = 'N';
+    $session['MRICaveat'] = 'false';
+    $session['Visit_label'] = $tmRow['EVENT_NAME']; 
+    $session['SubprojectID'] from TM;
+    $session['Submitted'] = 'N';
+    $session['Current_stage'] = 'visit';
+    $session['Data_stage_change']   date of import in Loris
+    $session['Date_active']  date of Visit in TM
+    $session['RegisteredBy']   if in TM if not $userID
+    $session['date_registered']  date of import in Loris
+    $session['scan_done'] = 'N';
+
+    
+
+    insert("session", $session);
+    return getLastInsertID();
+}
+
+function insertSample(array $tmRow) : bool
+{
+    $sample = array();
+
+    // insert container (with parents)
+    $tmLocation = $tmRow['STORAGE_ADDRESS'];
+    $locationSplit = explode('-',$tmLocation);
+    switch (substring($locationSplit[1], )) {
+        case 'FRZ':
+        case 'CRY':
+    
 
 
+    }
+    // insert preparation
+    // insert specimen_collection
+    // insert 
+}
+
+function updateSample(array $tmRow) : bool
+{
+
+}
