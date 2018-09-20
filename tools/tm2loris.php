@@ -32,7 +32,6 @@ if (count($argv) < 2 || $argv[1] == 'help') {
 }
 $userID = $argv[1];
 
-
 $DB =& \Database::singleton();
 
 //check user credential
@@ -134,7 +133,7 @@ while (($tmRow = oci_fetch_assoc($stid)) != false) {
         if (!$session['ID']) {
             $session['ID'] = insertSession($tmRow, $candidate['CandID'], $userID);
         }
-        insertSample($tmRow);
+        insertSample($DB, $tmRow);
     }
 
     
@@ -152,7 +151,7 @@ function insertCandidate(array $tmRow, array &$candidate) : bool
 
 }
 
-function insertSession(array $tmRow, $candID, $userID) : bool
+function insertSession($DB, $tmRow, $candID, $userID) : bool
 {
     $session = array();
     $session['CandID'] = $candID; 
@@ -164,35 +163,104 @@ function insertSession(array $tmRow, $candID, $userID) : bool
     $session['MRIQCPending'] = 'N';
     $session['MRICaveat'] = 'false';
     $session['Visit_label'] = $tmRow['EVENT_NAME']; 
-    $session['SubprojectID'] from TM;
+    $session['SubprojectID']= ''; //TODO from TM;
     $session['Submitted'] = 'N';
     $session['Current_stage'] = 'visit';
-    $session['Data_stage_change']   date of import in Loris
-    $session['Date_active']  date of Visit in TM
-    $session['RegisteredBy']   if in TM if not $userID
-    $session['date_registered']  date of import in Loris
+    $session['Data_stage_change'] = ""; //TODO  date of import in Loris
+    $session['Date_active'] = ''; //TODO  date of Visit in TM
+    $session['RegisteredBy'] = ''; //TODO  if in TM if not $userID
+    $session['date_registered'] = ''; //TODO date of import in Loris
     $session['scan_done'] = 'N';
 
     
 
-    insert("session", $session);
+    $DB->insert("session", $session);
     return getLastInsertID();
 }
 
-function insertSample(array $tmRow) : bool
+function insertSample($DB, array $tmRow) : bool
 {
+     //find pscID and other info
+    $sql = 'SELECT CenterID FROM psc WHERE Name = :name';
+    $pscID = $DB->pselectOne($sql, array('name' => '')); //TODO fill in center name   
+
+    $sql = 'SELECT ContainerStatutID FROM biobank_container_status WHERE Label = "Available"'; 
+    $containerStatusID = $DB->pselectOne($sql, array());
+
     $sample = array();
+    $sample['Temperature'] = //TODO check with Sonia
+    $sample['ContainerStatusID'] = $containerStatusID;
+    $sample['OriginCenter'] =  $pscID; 
+    $sample['CurrentCenter'] = $pscID;
+    $sample['DateTimeCreate'] = $tmRow['COLLECTION_DATE'];
 
     // insert container (with parents)
-    $tmLocation = $tmRow['STORAGE_ADDRESS'];
-    $locationSplit = explode('-',$tmLocation);
-    switch (substring($locationSplit[1], )) {
+    $tmLocation = array();
+    $locationSplit = explode('-',$tmRow['STORAGE_ADDRESS']);
+    switch (substring($locationSplit[1], 0, 3)) {
         case 'FRZ':
+            if ((int)substr($locationSplit[1], 3) < 9) {
+               $tmLocation[0]['descriptor'] = '5 Shelf';
+               $tmLocation[1]['descriptor'] = '6 Rack';
+               $tmLocation[2]['descriptor'] = '16 Box';
+               $tmLocation[3]['descriptor'] = '10x10';
+               $tmLocation[4]['descriptor'] = 'Cryotube';
+            } else {
+               $tmLocation[0]['descriptor'] = '3 Shelf';
+               $tmLocation[1]['descriptor'] = '7 Rack';
+               $tmLocation[2]['descriptor'] = '28 Box';
+               $tmLocation[3]['descriptor'] = '10x10';
+               $tmLocation[4]['descriptor'] = 'Cryotube';
+            }
+            $tmLocation[0]['type'] = 'Freezer';
+            $tmLocation[0]['barcode'] = $locationSplit[1];
+            $tmLocation[0]['location'] = substr($locationSplit[1], 3);
+            $tmLocation[1]['type'] = 'Shelf';
+            $tmLocation[1]['barcode'] = $tmLocation[0]['value'].'-'.substr($locationSplit[2], 1);
+            $tmLocation[1]['location'] = substr($locationSplit[2], 1);
+            $tmLocation[2]['type'] = 'Rack';
+            $tmLocation[2]['barcode'] = $tmLocation[1]['value'].'-'.substr($locationSplit[3], 1);
+            $tmLocation[2]['location'] = substr($locationSplit[3], 1);
+            $tmLocation[3]['type'] = 'Matrix Box';
+            $tmLocation[3]['barcode'] = $tmLocation[2]['value'].'-'.substr($locationSplit[4], 1);
+            $tmLocation[3]['location'] = substr($locationSplit[4], 1);
+            $tmLocation[4]['type'] = 'Tube'; 
+            $tmLocation[4]['barcode'] = $tmRow['STORAGE_ADDRESS'];
+            $tmLocation[4]['location'] = $locationSplit[5];
+            break;
         case 'CRY':
+
+            $tmLocation[0]['descriptor'] = '14 rack tank';
+            $tmLocation[0]['type'] = 'CryoTank';
+            $tmLocation[0]['barcode'] = $locationSplit[0].'-'.$locationSplit[1];
+            $tmLocation[0]['location'] = $locationSplit[2];
+            $tmLocation[1]['descriptor'] = '13 box';
+            $tmLocation[1]['type'] = 'Rack';
+            $tmLocation[1]['barcode'] = $tmLocation[0]['value'].'-'.substr($locationSplit[3], 1);
+            $tmLocation[0]['location'] = substr($locationSplit[3], 1);
+            $tmLocation[2]['descriptor'] = '10x10';
+            $tmLocation[2]['type'] = 'Matrix Box';
+            $tmLocation[2]['barcode'] = $tmLocation[1]['value'].'-'.substr($locationSplit[4], 1);
+            $tmLocation[0]['location'] = substr($locationSplit[4], 1);
+            $tmLocation[3]['descriptor'] = 'Cryotube';
+            $tmLocation[3]['type'] = 'Tube'; 
+            $tmLocation[3]['barcode'] = $tmRow['STORAGE_ADDRESS'];
+            $tmLocation[0]['location'] = $locationSplit[5];
+            break;
+        case 'VIR':
+            $storageType = 'VIRTUAL';
+            break;
+        default:
+    }
     
 
+        $containerID = insertContainer($DB, $tmLocation[0], $sample, null, false);
+        $size = count($tmLocation);
+        for ($i = 1; $i < $size - 1; $i++) {
+            $containerID = insertContainer($DB, $tmLocation[$i], $sample, $containerID, false);  
+        }
+        $containerID = insertContainer($DB, $tmLocation[$i], $sample, $containerID, true); 
 
-    }
     // insert preparation
     // insert specimen_collection
     // insert 
@@ -201,4 +269,32 @@ function insertSample(array $tmRow) : bool
 function updateSample(array $tmRow) : bool
 {
 
+}
+
+function insertContainer($container, $sample, $parent = null, $exclusif = true) : int
+{
+    //check if already exist
+    $sql = "SELECT ContainerID FROM biobank_container WHERE Barcode := barcode";
+    $exist = $DB->pselectOne($sql, array('barcode' => $container['barcode']));
+    if ($exist !== null) {
+        if ($exclusif === true) {
+            throw new LorisException('Barcode already taken');
+        } else {
+            return $exist;
+        }
+    }
+    //not existant, add
+
+    $sql = 'SELECT ContainerTypeID FROM biobank_container_type WHERE Type := type and Descriptor := Descriptor';
+    $containerTypeID = pselectOne($sql, array('Type' => $container['type'], 'Descriptor' => $container['descriptor']));
+
+    $sample['Barcode'] = $container['barcode'];
+    $sample['ContainerTypeID'] = $containerTypeID;
+    $DB->insert('biobank_container', $sample);
+    $containerID = $DB->getLastInsertId();
+
+    //parent container
+    if ($parent !== null) {
+        $DB->insert('biobank_container_parent', array($ContainerID, $parent, $sample['location']));
+    }
 }
