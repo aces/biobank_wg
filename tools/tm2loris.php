@@ -133,13 +133,8 @@ while (($tmRow = oci_fetch_assoc($stid)) != false) {
         if (!$session['ID']) {
             $session['ID'] = insertSession($tmRow, $candidate['CandID'], $userID);
         }
-        insertSample($DB, $tmRow);
+        insertSample($DB, $tmRow, $candID);
     }
-
-    
-
-
-
 }
 
 function insertCandidate(array $tmRow, array &$candidate) : bool
@@ -178,7 +173,7 @@ function insertSession($DB, $tmRow, $candID, $userID) : bool
     return getLastInsertID();
 }
 
-function insertSample($DB, array $tmRow) : bool
+function insertSample($DB, array $tmRow, int $candID) : bool
 {
      //find pscID and other info
     $sql = 'SELECT CenterID FROM psc WHERE Name = :name';
@@ -254,16 +249,15 @@ function insertSample($DB, array $tmRow) : bool
     }
     
 
-        $containerID = insertContainer($DB, $tmLocation[0], $sample, null, false);
-        $size = count($tmLocation);
-        for ($i = 1; $i < $size - 1; $i++) {
-            $containerID = insertContainer($DB, $tmLocation[$i], $sample, $containerID, false);  
-        }
-        $containerID = insertContainer($DB, $tmLocation[$i], $sample, $containerID, true); 
+    $containerID = insertContainer($DB, $tmLocation[0], $sample, null, false);
+    $size = count($tmLocation);
+    for ($i = 1; $i < $size - 1; $i++) {
+        $containerID = insertContainer($DB, $tmLocation[$i], $sample, $containerID, false);  
+    }
+    $containerID = insertContainer($DB, $tmLocation[$i], $sample, $containerID, true); 
 
-    // insert preparation
-    // insert specimen_collection
-    // insert 
+    // insert specimen
+    $specimenID = insertSpecimen($DB, $tmRow, $containerID, $candID, $sessionID); 
 }
 
 function updateSample(array $tmRow) : bool
@@ -276,13 +270,13 @@ function insertContainer($container, $sample, $parent = null, $exclusif = true) 
     //check if already exist
     $sql = "SELECT ContainerID FROM biobank_container WHERE Barcode := barcode";
     $exist = $DB->pselectOne($sql, array('barcode' => $container['barcode']));
-    if ($exist !== null) {
-        if ($exclusif === true) {
+/*    if ($exist !== null) {
+        if ($exclusif === true) { // TODO find what cause syntax error
             throw new LorisException('Barcode already taken');
         } else {
             return $exist;
         }
-    }
+    }  */
     //not existant, add
 
     $sql = 'SELECT ContainerTypeID FROM biobank_container_type WHERE Type := type and Descriptor := Descriptor';
@@ -298,3 +292,67 @@ function insertContainer($container, $sample, $parent = null, $exclusif = true) 
         $DB->insert('biobank_container_parent', array($ContainerID, $parent, $sample['location']));
     }
 }
+
+function insertSpecimen($DB, array $tmRow, int $containerID, $candID, $sessionID) : int
+{
+    $specimen = array();
+    $specimen['ContainerID'] = $containerID;
+    $specimen['CandidateID'] = $candID;
+    $specimen['SessionID'] = $sessionID;
+
+    $sql = 'SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label := lable';
+    $specimen['SpecimenTypeID'] = $DB->pselectOne($sql, array('Label' => $tmRow['SAMPLE_TYPE']));
+    if ($specimenTypeID === null) {
+        throw new LorisException('invalid specimen type'); //TODO to refine
+    }
+    $specimen['Quantity'] = $tmRow['QTY_ON_HAND'];
+    $specimen['UnitID'] = $tmRow['QTY_UNITS'];
+ 
+    $DB->insert('biobank_specimen', $specimen);
+    $specimenID = $DB->getLastInsertID();
+
+    // freezethaw
+    if (is_int($tmRow['FT_CYCLES'])) {    
+        $DB->insert('biobank_specimen_freezethaw', array('SpecimenID' => $specimenID,
+                                                         'FreezeThawCycle' => $tmRow['FT_CYCLES']));
+    }
+
+    // insert preparation
+    $specimenPrep = array();
+    $specimentPrep['SpecimenID'] = $specimenID;
+
+    $sql = 'SELECT SpecimenProtocolID FROM biobank_specimen_protocol WHERE Label := label';
+    $specimenPrep['SpecimenProtocolID'] = $DB->pselectOne($sql, array('label' => $tmRow['SAMPLE_CATEGORY']));
+    if ($specimenPrep['SpecimenProtocolID'] === null) { 
+        throw new LorisException ('specimen_protocol inexistant'); // TODO to refine
+    }
+
+    $specimentPrep['CenterID'] = 1; // TODO à revoir
+    $specimenPrep['Date'] = '20'.$tmRow['PREP_DATE'];  //yy-mm-dd
+    $specimenPrep['Time'] = '00:00:00';
+        
+    $json = ''; // TODO
+    $specimenPrep['JSON'] = $json;
+
+    $DB->insert('biobank_specimen_preparation', $specimenPrep);
+
+    // insert specimen_collection
+    $specimenColl = array();
+    $specimentColl['SpecimenID'] = $specimenID;
+    $specimentColl['Quantity'] = $tmRow['QTY_ON_HAND'];
+    $specimentColl['UnitID'] = $tmRow['QTY_UNITS'];;
+    $specimentColl['CenterID'] = 1; // TODO à revoir
+
+    $specimentColl['Date'] = substr($tmRow['EVENT_DATE'], 0, 1) == 9 
+        ? '19'.$tmRow['EVENT_DATE'] : '20'.$tmRow['EVENT_DATE'];
+    $specimentColl['Time'] = '00:00:00';
+
+    $json = ''; //TODO
+    $specimentColl['JSON'] = $json;
+
+    $DB->insert('biobank_specimen_collection', $specimenColl);
+
+    return $specimenID;
+}
+
+
