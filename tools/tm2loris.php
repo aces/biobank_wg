@@ -14,10 +14,19 @@
  *
  * @category Module
  * @package  BioBank-wg
- * @author   Various <melanie.legault2@mcgill.ca>
+ * @author   Mélanie Legault <melanie.legault2@mcgill.ca>
  * @license  Loris license
  * @link     https://www.github.com/aces/biobank_wg/
  */
+
+//TODO list:
+// add candidate
+// update sample
+// json data for specimen
+// centerID
+// sample temperature
+// qty_unit
+
 
 require_once __DIR__ ."/cred.inc";  //Oracle DB credential
 require_once __DIR__ . "/../../../vendor/autoload.php";
@@ -97,7 +106,7 @@ function showHelp()
 }
 
 $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
-    PREP_DATE, STORAGE_STATUS, INSTITUTION, COLLECTED_BY, QTY_UNITS,
+    PREP_DATE, PREP_BY, STORAGE_STATUS, INSTITUTION, COLLECTED_BY, QTY_UNITS,
     SITE_OF_TISSUE, STORAGE_ADDRESS, QTY_ON_HAND, SAMPLE_CATEGORY, 
     COLLECTION_DATE, SITE_CODE, S.COMMENTS, D.SEX, FILE1, DATE_OF_BIRTH,
     s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME, e.EVENT_DATE
@@ -152,7 +161,7 @@ while (($tmRow = oci_fetch_assoc($stid)) != false) {
 
 function insertCandidate(array $tmRow, array &$candidate) : bool
 {
-    // wait for confirmation if needed
+    // wait for confirmation if needed   TODO waiting for CRU
     $candidate['active']      = 'Y';
     $candidate['CenterID']    = '';
     $candidate['Testdate']    = ''; // from TM
@@ -188,11 +197,16 @@ function insertSession($tmRow, $candID, $userID) : bool
     $session['Submitted']         = 'N';
     $session['Current_stage']     = 'visit';
     $session['Data_stage_change'] = $today;
-    $session['Date_active']       =  substr($tmRow['EVENT_DATE'], 0, 1) == 9
-        ? '19'.$tmRow['EVENT_DATE'] : '20'.$tmRow['EVENT_DATE'];
-    $session['RegisteredBy']      = ''; //TODO  if in TM if not $userID
     $session['date_registered']   = $today;
     $session['scan_done']         = 'N';
+    $session['Date_active']       =  substr($tmRow['EVENT_DATE'], 0, 1) == 9
+        ? '19'.$tmRow['EVENT_DATE'] : '20'.$tmRow['EVENT_DATE'];
+
+    if (!empty($tmRow['PREP_BY']) && trim($tmRow['PREP_BY']) != '') {
+        $session['RegisteredBy'] = trim($tmRow['PREP_BY']);
+    } else {
+        $session['RegisteredBy'] = $userID;
+    } 
 
     $DB->insert("session", $session);
     return getLastInsertID();
@@ -297,7 +311,41 @@ function insertSample(array $tmRow, int $candID) : bool
 
 function updateSample(array $tmRow) : bool
 {
-    //check if need update using hash?
+    // TODO need to check:
+    // - container location
+    // - Quantity
+    // - freeze thaw cycle
+    
+    $sql = "SELECT SpecimentID, Quantity, Barcode, FreezeThawCycle
+        FROM biobank_specimen bs
+        JOIN biobank_container bc ON bs.ContainerID = bc.ContainerID
+        LEFT JOIN biobank_specimen_freezethaw bsf ON bs.SpecimenID = bsf.SpecimenID
+        WHERE bc.Barcode := barcode";
+    $current = $DB->pselectOne($sql, array('barcode' => $tmRow['STORAGE_ADDRESS']));
+
+    if ($current['Quantity'] != $tmRow['QTY_ON_HAND']){
+        $DB->update('biobank_specimen',
+            array(
+                'Quantity' => $tmRow['QTY_ON_HAND'],
+                'UnitID'   => getUnitID($tmRow['QTY_UNITS'])
+            ),
+            array('SpecimenID' => $current['SpecimentID'])
+        );
+    }
+
+    if ($current['Barcode'] != $tmRow['STORAGE_ADDRESS']){
+        //update location
+        //$DB->update('biobank_specimen',
+        //    array('Quantity' => $tmRow['QTY_ON_HAND'])
+    }
+
+    if ($current['FreezeThawCycle'] != $tmRow['FT_CYCLES']){
+        $DB->update('biobank_specimen_freezethaw',
+            array('FreezeThawCycle' => $tmRow['FT_CYCLES']),
+            array('SpecimenID' = $current['SpecimenID'])
+        );
+    }
+    
 }
 
 function insertContainer($container, $sample, $parent = null, $exclusif = true) : int
@@ -366,7 +414,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
         throw new LorisException('invalid specimen type'); //TODO to refine
     }
     $specimen['Quantity'] = $tmRow['QTY_ON_HAND'];
-    $specimen['UnitID']   = $tmRow['QTY_UNITS'];
+    $specimen['UnitID']   = getUnitID($tmRow['QTY_UNITS']);
 
     $DB->insert('biobank_specimen', $specimen);
     $specimenID = $DB->getLastInsertID();
@@ -384,7 +432,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
 
     // insert preparation
     $specimenPrep = array();
-    $specimentPrep['SpecimenID'] = $specimenID;
+    $specimenPrep['SpecimenID'] = $specimenID;
 
     $sql = 'SELECT SpecimenProtocolID
         FROM biobank_specimen_protocol
@@ -397,7 +445,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
         throw new LorisException('specimen_protocol inexistant'); // TODO to refine
     }
 
-    $specimentPrep['CenterID'] = 1; // TODO à revoir
+    $specimenPrep['CenterID'] = 1; // TODO à revoir
     $specimenPrep['Date']      = '20'.$tmRow['PREP_DATE'];  //yy-mm-dd
     $specimenPrep['Time']      = '00:00:00';
 
@@ -424,4 +472,12 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
     return $specimenID;
 }
 
-
+function getUnitID(string $tmUnit) : int
+{
+    $sql = "SELECT UnitID FROM biobank_unit WHERE Label := label";
+    $unit = $DB->pselectOne($sql, array('label' => $tmUnit));
+    if ($unit === false) {
+        throw new LorisException('TM quantity unit not found');
+    }
+    return $unit;
+}
