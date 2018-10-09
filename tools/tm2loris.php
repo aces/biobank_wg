@@ -73,7 +73,9 @@ if (!oci_execute($stid)) {
 
 
 /**
+ * helper function to get the Loris password of the user
  *
+ * @return string the password.
  */
 function readline_terminal($prompt = '')
 {
@@ -82,7 +84,7 @@ function readline_terminal($prompt = '')
     $h = fopen($terminal_device, 'r');
     if ($h === false) {
         //throw new RuntimeException("Failed to open terminal device $terminal_device");
-        return false; / probably not running in a terminal.
+        return false; // probably not running in a terminal.
     }
     `/bin/stty -echo`;
     $line = rtrim(fgets($h), "\r\n");
@@ -91,7 +93,8 @@ function readline_terminal($prompt = '')
     return $line;
 }
 
-/** show the help message on the terminal
+/** 
+ * show the help message on the terminal
  *
  */
 function showHelp()
@@ -155,7 +158,8 @@ while (($tmRow = oci_fetch_assoc($stid)) != false) {
     }
 }
 
-/** insert a candidate into LORIS
+/** 
+ * insert a candidate into LORIS
  *
  */
 
@@ -169,7 +173,8 @@ function insertCandidate(array $tmRow, array &$candidate) : bool
 
 }
 
-/** insert the session information for a sample
+/** 
+ * insert the session information for a sample
  *
  * @param array $tmRow row of data for Oracle DB
  * @param int   $canID the candidate ID
@@ -212,6 +217,14 @@ function insertSession($tmRow, $candID, $userID) : bool
     return getLastInsertID();
 }
 
+/** 
+ * insert a sample and location. Build the container as required
+ *
+ * @param array $tmRow row of data for Oracle DB
+ * @param int   $canID the candidate ID
+ *
+ * @return bool succes of the insertion
+ */
 function insertSample(array $tmRow, int $candID) : bool
 {
     $DB =& \Database::singleton();
@@ -233,8 +246,29 @@ function insertSample(array $tmRow, int $candID) : bool
     $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
 
     // insert container (with parents)
+    $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS']);
+    $containerID = insertContainer($tmLocation[0], $sample, null, false);
+    $size        = count($tmLocation);
+    for ($i = 1; $i < $size - 1; $i++) {
+        $containerID = insertContainer($tmLocation[$i], $sample, $containerID, false);
+    }
+    $containerID = insertContainer($tmLocation[$i], $sample, $containerID, true);
+
+    // insert specimen
+    $specimenID = insertSpecimen($tmRow, $containerID, $candID, $sessionID);
+}
+
+/** 
+ * insert explode a storage location in various container
+ *
+ * @param string $storageAdress from TM Oracle DB
+ *
+ * @return array the explode location 
+ */
+function explodeLocation(string $storageAdress) : array
+{
     $tmLocation    = array();
-    $locationSplit = explode('-', $tmRow['STORAGE_ADDRESS']);
+    $locationSplit = explode('-', $storageAdress);
     switch (substring($locationSplit[1], 0, 3)) {
         case 'FRZ':
             if ((int)substr($locationSplit[1], 3) < 9) {
@@ -266,7 +300,7 @@ function insertSample(array $tmRow, int $candID) : bool
                 substr($locationSplit[4], 1);
             $tmLocation[3]['location'] = substr($locationSplit[4], 1);
             $tmLocation[4]['type']     = 'Tube';
-            $tmLocation[4]['barcode']  = $tmRow['STORAGE_ADDRESS'];
+            $tmLocation[4]['barcode']  = $storageAdress;
             $tmLocation[4]['location'] = $locationSplit[5];
             break;
 
@@ -288,7 +322,7 @@ function insertSample(array $tmRow, int $candID) : bool
             $tmLocation[0]['location']   = substr($locationSplit[4], 1);
             $tmLocation[3]['descriptor'] = 'Cryotube';
             $tmLocation[3]['type']       = 'Tube';
-            $tmLocation[3]['barcode']    = $tmRow['STORAGE_ADDRESS'];
+            $tmLocation[3]['barcode']    = $storageAdress;
             $tmLocation[0]['location']   = $locationSplit[5];
             break;
 
@@ -298,23 +332,23 @@ function insertSample(array $tmRow, int $candID) : bool
         default:
     }
 
-    $containerID = insertContainer($tmLocation[0], $sample, null, false);
-    $size        = count($tmLocation);
-    for ($i = 1; $i < $size - 1; $i++) {
-        $containerID = insertContainer($tmLocation[$i], $sample, $containerID, false);
-    }
-    $containerID = insertContainer($tmLocation[$i], $sample, $containerID, true);
-
-    // insert specimen
-    $specimenID = insertSpecimen($tmRow, $containerID, $candID, $sessionID);
+    return $tmLocation;
 }
 
+/** 
+ * update the information for a sample.
+ * check and modify as required:
+ * - container location
+ * - quantity
+ * - freeze thaw cycle 
+ *
+ * @param array $tmRow row of data for Oracle DB
+ *
+ * @return bool succes of the insertion
+ */
 function updateSample(array $tmRow) : bool
 {
-    // TODO need to check:
-    // - container location
-    // - Quantity
-    // - freeze thaw cycle
+
     
     $sql = "SELECT SpecimentID, Quantity, Barcode, FreezeThawCycle
         FROM biobank_specimen bs
@@ -334,20 +368,30 @@ function updateSample(array $tmRow) : bool
     }
 
     if ($current['Barcode'] != $tmRow['STORAGE_ADDRESS']){
-        //update location
-        //$DB->update('biobank_specimen',
-        //    array('Quantity' => $tmRow['QTY_ON_HAND'])
+        //update location  TODO  need input from Sonia
+        $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS']);
+
     }
 
     if ($current['FreezeThawCycle'] != $tmRow['FT_CYCLES']){
         $DB->update('biobank_specimen_freezethaw',
             array('FreezeThawCycle' => $tmRow['FT_CYCLES']),
-            array('SpecimenID' = $current['SpecimenID'])
+            array('SpecimenID'      => $current['SpecimenID'])
         );
     }
     
 }
 
+/** 
+ * insert a container if it not already exist
+ * create the parent relation if applicable
+ *
+ * @param array $tmRow row of data for Oracle DB
+ * @param int   $canID the candidate ID
+ * @param int   $userID the userID of the person running the script
+ *
+ * @return int the ContainerID
+ */
 function insertContainer($container, $sample, $parent = null, $exclusif = true) : int
 {
     $DB =& \Database::singleton();
@@ -394,6 +438,18 @@ function insertContainer($container, $sample, $parent = null, $exclusif = true) 
     }
 }
 
+/** insert the specimen and related table information
+ * - freeze thaw cycle
+ * - preparation
+ * - collection
+ *
+ * @param array $tmRow row of data for Oracle DB
+ * @param int   $containerID the container in which the speciment is located
+ * @param int   $canID the candidate ID
+ * @param int   $sessionID the session at which the specimen was collected
+ *
+ * @return int the specimenID
+ */
 function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : int
 {
     $DB =& \Database::singleton();
@@ -472,6 +528,12 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
     return $specimenID;
 }
 
+/** get the ID of the mesurement unit in LorisDB
+ *
+ * @param string $tmUnit the unit label in TM database
+ *
+ * @return int the UnitID
+ */
 function getUnitID(string $tmUnit) : int
 {
     $sql = "SELECT UnitID FROM biobank_unit WHERE Label := label";
