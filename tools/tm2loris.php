@@ -63,8 +63,7 @@ if (!$orConn) {
     exit(2);
 }
 
-$stid = oci_parse($orConn, 'ALTER SESSION SET CURRENT_SCHEMA = SYSTMETRIX');
-    //TODO put schema in config file
+$stid = oci_parse($orConn, 'ALTER SESSION SET CURRENT_SCHEMA = '.$schema);
 if (!oci_execute($stid)) {
     $e = oci_error();
     print "Error!: " . $e->getMessage();
@@ -198,7 +197,7 @@ function insertSession($tmRow, $candID, $userID) : bool
     $session['MRIQCPending']      = 'N';
     $session['MRICaveat']         = 'false';
     $session['Visit_label']       = $tmRow['EVENT_NAME'];
-    $session['SubprojectID']      = ''; //TODO from TM;
+    $session['SubprojectID']      = ''; //TODO from TM - waiting for CRU
     $session['Submitted']         = 'N';
     $session['Current_stage']     = 'visit';
     $session['Data_stage_change'] = $today;
@@ -287,18 +286,22 @@ function explodeLocation(string $storageAdress) : array
             $tmLocation[0]['type']     = 'Freezer';
             $tmLocation[0]['barcode']  = $locationSplit[1];
             $tmLocation[0]['location'] = substr($locationSplit[1], 3);
+
             $tmLocation[1]['type']     = 'Shelf';
             $tmLocation[1]['barcode']  = $tmLocation[0]['value'].'-'.
                 substr($locationSplit[2], 1);
             $tmLocation[1]['location'] = substr($locationSplit[2], 1);
+
             $tmLocation[2]['type']     = 'Rack';
             $tmLocation[2]['barcode']  = $tmLocation[1]['value'].'-'.
                 substr($locationSplit[3], 1);
             $tmLocation[2]['location'] = substr($locationSplit[3], 1);
+
             $tmLocation[3]['type']     = 'Matrix Box';
             $tmLocation[3]['barcode']  = $tmLocation[2]['value'].'-'.
                 substr($locationSplit[4], 1);
             $tmLocation[3]['location'] = substr($locationSplit[4], 1);
+
             $tmLocation[4]['type']     = 'Tube';
             $tmLocation[4]['barcode']  = $storageAdress;
             $tmLocation[4]['location'] = $locationSplit[5];
@@ -310,20 +313,23 @@ function explodeLocation(string $storageAdress) : array
             $tmLocation[0]['barcode']    = $locationSplit[0].'-'.
                 $locationSplit[1];
             $tmLocation[0]['location']   = $locationSplit[2];
+
             $tmLocation[1]['descriptor'] = '13 box';
             $tmLocation[1]['type']       = 'Rack';
             $tmLocation[1]['barcode']    = $tmLocation[0]['value'].'-'.
                 substr($locationSplit[3], 1);
-            $tmLocation[0]['location']   = substr($locationSplit[3], 1);
+            $tmLocation[1]['location']   = substr($locationSplit[3], 1);
+
             $tmLocation[2]['descriptor'] = '10x10';
             $tmLocation[2]['type']       = 'Matrix Box';
             $tmLocation[2]['barcode']    = $tmLocation[1]['value'].'-'.
                 substr($locationSplit[4], 1);
-            $tmLocation[0]['location']   = substr($locationSplit[4], 1);
+            $tmLocation[2]['location']   = substr($locationSplit[4], 1);
+
             $tmLocation[3]['descriptor'] = 'Cryotube';
             $tmLocation[3]['type']       = 'Tube';
             $tmLocation[3]['barcode']    = $storageAdress;
-            $tmLocation[0]['location']   = $locationSplit[5];
+            $tmLocation[3]['location']   = $locationSplit[5];
             break;
 
         case 'VIR':
@@ -505,8 +511,13 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
     $specimenPrep['Date']      = '20'.$tmRow['PREP_DATE'];  //yy-mm-dd
     $specimenPrep['Time']      = '00:00:00';
 
-    $json = ''; // TODO
-    $specimenPrep['JSON'] = $json;
+    $json = array(); // TODO  create a loop with a table (global array with ID)for each possible category prep, coll, ...
+    if ( isset($tmRow['DISEASE_CODE']) && !empty(trim($tmRow['DISEASE_CODE']))) {
+        $jsonID = getJsonID('DISEASE_CODE']);
+        $json[$jsonID] = trim($tmRow['DISEASE_CODE']);
+    }
+    
+    $specimenPrep['JSON'] = getJson($tmRow, 'preparation');
 
     $DB->insert('biobank_specimen_preparation', $specimenPrep);
 
@@ -521,6 +532,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
     $specimenColl['Time'] = '00:00:00';
 
     $json = ''; //TODO
+
     $specimenColl['JSON'] = $json;
 
     $DB->insert('biobank_specimen_collection', $specimenColl);
@@ -528,7 +540,8 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
     return $specimenID;
 }
 
-/** get the ID of the mesurement unit in LorisDB
+/** 
+ * get the ID of the mesurement unit in LorisDB
  *
  * @param string $tmUnit the unit label in TM database
  *
@@ -543,3 +556,24 @@ function getUnitID(string $tmUnit) : int
     }
     return $unit;
 }
+
+/** 
+ * create the json string with attributes for a category
+ * ues global arrays for list of attributes to check and ID
+ *
+ */
+
+function getJson(array $stRow, string $category) : string
+{
+
+}
+
+/** 
+ * get the ID to use in JSON attributes and populates global arrays
+ */
+function getJsonID()
+{
+
+}
+
+
