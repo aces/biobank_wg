@@ -54,8 +54,6 @@ if (!$auth->passwordAuthenticate($userID, $userPWD, false)) {
 
 
 // connect to the Oracle DB
-global $orConn;
-
 $orConn = oci_connect($user, $passwd, $service);
 if (!$orConn) {
     $e = oci_error();
@@ -70,42 +68,8 @@ if (!oci_execute($stid)) {
     exit(2);
 }
 
-
-/**
- * helper function to get the Loris password of the user
- *
- * @return string the password.
- */
-function readline_terminal($prompt = '')
-{
-    $prompt && print $prompt;
-    $terminal_device = '/dev/tty';
-    $h = fopen($terminal_device, 'r');
-    if ($h === false) {
-        //throw new RuntimeException("Failed to open terminal device $terminal_device");
-        return false; // probably not running in a terminal.
-    }
-    `/bin/stty -echo`;
-    $line = rtrim(fgets($h), "\r\n");
-    `/bin/stty echo`;
-    fclose($h);
-    return $line;
-}
-
-/** 
- * show the help message on the terminal
- *
- */
-function showHelp()
-{
-    echo "***Import samples data from Tissus Metrix***\n\n";
-    echo "Usage: php tm2loris.php userID [confirm]\n\n";
-    echo "If confirm is used, the data will be pushed to the LORIS database.\n";
-    echo "If not, a count of how many samples, candidate, and session\n";
-    echo "information to be added or updated will be shown.\n";
-
-    exit(1);
-}
+//get the list of ID for json attributes in LorisDB
+$jsonIDs = getJsonID($jsonAttributes);
 
 $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
     PREP_DATE, PREP_BY, STORAGE_STATUS, INSTITUTION, COLLECTED_BY, QTY_UNITS,
@@ -155,6 +119,42 @@ while (($tmRow = oci_fetch_assoc($stid)) != false) {
         }
         insertSample($DB, $tmRow, $candID);
     }
+}
+
+/**
+ * helper function to get the Loris password of the user
+ *
+ * @return string the password.
+ */
+function readline_terminal($prompt = '')
+{
+    $prompt && print $prompt;
+    $terminal_device = '/dev/tty';
+    $h = fopen($terminal_device, 'r');
+    if ($h === false) {
+        //throw new RuntimeException("Failed to open terminal device $terminal_device");
+        return false; // probably not running in a terminal.
+    }
+    `/bin/stty -echo`;
+    $line = rtrim(fgets($h), "\r\n");
+    `/bin/stty echo`;
+    fclose($h);
+    return $line;
+}
+
+/** 
+ * show the help message on the terminal
+ *
+ */
+function showHelp()
+{
+    echo "***Import samples data from Tissus Metrix***\n\n";
+    echo "Usage: php tm2loris.php userID [confirm]\n\n";
+    echo "If confirm is used, the data will be pushed to the LORIS database.\n";
+    echo "If not, a count of how many samples, candidate, and session\n";
+    echo "information to be added or updated will be shown.\n";
+
+    exit(1);
 }
 
 /** 
@@ -511,12 +511,6 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
     $specimenPrep['Date']      = '20'.$tmRow['PREP_DATE'];  //yy-mm-dd
     $specimenPrep['Time']      = '00:00:00';
 
-    $json = array(); // TODO  create a loop with a table (global array with ID)for each possible category prep, coll, ...
-    if ( isset($tmRow['DISEASE_CODE']) && !empty(trim($tmRow['DISEASE_CODE']))) {
-        $jsonID = getJsonID('DISEASE_CODE']);
-        $json[$jsonID] = trim($tmRow['DISEASE_CODE']);
-    }
-    
     $specimenPrep['JSON'] = getJson($tmRow, 'preparation');
 
     $DB->insert('biobank_specimen_preparation', $specimenPrep);
@@ -566,14 +560,44 @@ function getUnitID(string $tmUnit) : int
 function getJson(array $stRow, string $category) : string
 {
 
+    global $jsonAttributes;
+    global $jsonIDs;
+
+    $json = array();
+    foreach ($jsonAttributes[$category] as $key => $label){
+        if ( isset($tmRow[$key]) && !empty(trim($tmRow[$key]))) {
+            $id = $jsonIDs[$label];
+            $json[$id] = trim($tmRow[$key]);
+        }
+    }
+
+    return json_encode($json, JSON_NUMERIC_CHECK); //check format with Henry
 }
 
 /** 
  * get the ID to use in JSON attributes and populates global arrays
  */
-function getJsonID()
+function getJsonID(array $jsonAttributes) : array
 {
+    $listOfAttributes = array();
+    foreach ($jsonAttributes as $key => $val) {
+        foreach ($val as $attribute) {
+           $listOfAttributes[] = $attribute; 
+        }
+    }
+    $listOfAttributes = array_unique($listOfAttributes);
 
+    $jsonID = array();
+    $DB     =& \Database::singleton();
+
+    foreach ($listOfAttributes as $label) {
+        $sql = "SELECT SpecimenAttributeID 
+            FROM biobank_specimen_attribute
+            WHERE Label := label";
+        $jsonID[$label] = $DB->pselectOne($sql, array('label' => $label));
+    }
+
+    return $jsonID;
 }
 
 
