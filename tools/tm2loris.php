@@ -22,9 +22,6 @@
 //TODO list:
 // add candidate
 // update sample
-// json data for specimen
-// centerID
-// sample temperature
 // qty_unit
 
 
@@ -44,7 +41,7 @@ $userID = $argv[1];
 $DB =& \Database::singleton();
 
 //check user credential
-$userPWD = readline_terminal("\nPlease enter your LORIS password");
+$userPWD = readlineTerminal("\nPlease enter your LORIS password");
 $auth    = new SinglePointLogin;
 
 if (!$auth->passwordAuthenticate($userID, $userPWD, false)) {
@@ -68,6 +65,16 @@ if (!oci_execute($stid)) {
     exit(2);
 }
 
+//insert default centerID
+$centerID = pselectOne(
+    "SELECT CenterID FROM PSC
+     WHERE Name = :centerName",
+    array('Name' => $defaultCenterName['Name'])
+);
+if (!$centerID) {
+    $centerID = insertCenter($defaultCenterName);
+}
+
 //get the list of ID for json attributes in LorisDB
 $jsonIDs = getJsonID($jsonAttributes);
 
@@ -75,10 +82,11 @@ $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
     PREP_DATE, PREP_BY, STORAGE_STATUS, INSTITUTION, COLLECTED_BY, QTY_UNITS,
     SITE_OF_TISSUE, STORAGE_ADDRESS, QTY_ON_HAND, SAMPLE_CATEGORY, 
     COLLECTION_DATE, SITE_CODE, S.COMMENTS, D.SEX, FILE1, DATE_OF_BIRTH,
-    s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME, e.EVENT_DATE
+    s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME, e.EVENT_DATE, S.BANK_ID, BANK_NAME
 FROM TM_SAMPLES S 
 LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
-LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID";
+LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
+LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID";
 
 $stid = oci_parse($orConn, $orQuery);
 oci_execute($stid);
@@ -115,24 +123,27 @@ while (($tmRow = oci_fetch_assoc($stid)) != false) {
             array(':candID' => $candidate['PSCID'])
         );
         if (!$session['ID']) {
-            $session['ID'] = insertSession($tmRow, $candidate['CandID'], $userID);
+            $session['ID'] = insertSession($tmRow, $candidate['CandID'], $userID, $centerID);
         }
-        insertSample($DB, $tmRow, $candID);
+        insertSample($DB, $tmRow, $candID, $centerID);
     }
 }
 
 /**
- * helper function to get the Loris password of the user
+ * Helper function to get the Loris password of the user
+ *
+ * @param string $prompt message to send on tty
  *
  * @return string the password.
  */
-function readline_terminal($prompt = '')
+function readlineTerminal($prompt = '')
 {
     $prompt && print $prompt;
     $terminal_device = '/dev/tty';
     $h = fopen($terminal_device, 'r');
     if ($h === false) {
-        //throw new RuntimeException("Failed to open terminal device $terminal_device");
+        //throw new RuntimeException("Failed to open terminal
+        //                            device $terminal_device");
         return false; // probably not running in a terminal.
     }
     `/bin/stty -echo`;
@@ -142,9 +153,10 @@ function readline_terminal($prompt = '')
     return $line;
 }
 
-/** 
- * show the help message on the terminal
+/**
+ * Show the help message on the terminal
  *
+ * @return void
  */
 function showHelp()
 {
@@ -157,11 +169,13 @@ function showHelp()
     exit(1);
 }
 
-/** 
- * insert a candidate into LORIS
+/**
+ * Insert a candidate into LORIS
+ * @param array $tmRow     row of data for Oracle DB
+ * @param array $candidate row of data for Oracle DB
  *
+ * @return void
  */
-
 function insertCandidate(array $tmRow, array &$candidate) : bool
 {
     // wait for confirmation if needed   TODO waiting for CRU
@@ -172,24 +186,36 @@ function insertCandidate(array $tmRow, array &$candidate) : bool
 
 }
 
-/** 
- * insert the session information for a sample
+/**
+ * Insert the session information for a sample
  *
- * @param array $tmRow row of data for Oracle DB
- * @param int   $canID the candidate ID
- * @param int   $userID the userID of the person running the script
+ * @param array $tmRow    row of data for Oracle DB
+ * @param int   $candID   the candidate ID
+ * @param int   $userID   the userID of the person running the script
+ * @param int   $centerID the ID of the center where the sample where collected
  *
  * @return bool succes of the insertion
  */
-function insertSession($tmRow, $candID, $userID) : bool
+function insertSession($tmRow, $candID, $userID, $centerID) : bool
 {
     $DB =& \Database::singleton();
 
     $today = date('Y-m-d');
 
+    // check if subproject exist
+    $session['SubprojectID'] = $DB->pselectOne(
+        "SELECT SubprojectID
+         FROM subproject
+         WHERE title = :bankName",
+        array(':bankName' => $tmRow['BANK_NAME'])
+    );
+    if (!$session['SubprojectID']) {
+        $session['SubprojectID'] = insertSubproject($tmRow['BANK_NAME']);
+    }
+
     $session           = array();
     $session['CandID'] = $candID;
-    $session['CenterID']          = ""; // need to set to specific
+    $session['CenterID']          = $centerID;
     $session['Active']            = 'Y';
     $session['UserID']            = $userID;
     $session['Hardcopy-request']  = '-';
@@ -197,7 +223,6 @@ function insertSession($tmRow, $candID, $userID) : bool
     $session['MRIQCPending']      = 'N';
     $session['MRICaveat']         = 'false';
     $session['Visit_label']       = $tmRow['EVENT_NAME'];
-    $session['SubprojectID']      = ''; //TODO from TM - waiting for CRU
     $session['Submitted']         = 'N';
     $session['Current_stage']     = 'visit';
     $session['Data_stage_change'] = $today;
@@ -210,27 +235,24 @@ function insertSession($tmRow, $candID, $userID) : bool
         $session['RegisteredBy'] = trim($tmRow['PREP_BY']);
     } else {
         $session['RegisteredBy'] = $userID;
-    } 
+    }
 
     $DB->insert("session", $session);
     return getLastInsertID();
 }
 
-/** 
- * insert a sample and location. Build the container as required
+/**
+ * Insert a sample and location. Build the container as required
  *
- * @param array $tmRow row of data for Oracle DB
- * @param int   $canID the candidate ID
+ * @param array $tmRow    row of data for Oracle DB
+ * @param int   $candID   the candidate ID
+ * @param int   $centerID the ID of the center where the sample where collected
  *
  * @return bool succes of the insertion
  */
-function insertSample(array $tmRow, int $candID) : bool
+function insertSample(array $tmRow, int $candID, $centerID) : bool
 {
     $DB =& \Database::singleton();
-
-     //find pscID and other info
-    $sql   = 'SELECT CenterID FROM psc WHERE Name = :name';
-    $pscID = $DB->pselectOne($sql, array('name' => '')); //TODO fill in center name
 
     $sql = 'SELECT ContainerStatutID
             FROM biobank_container_status
@@ -238,10 +260,9 @@ function insertSample(array $tmRow, int $candID) : bool
     $containerStatusID = $DB->pselectOne($sql, array());
 
     $sample = array();
-    $sample['Temperature']       = //TODO check with Sonia
     $sample['ContainerStatusID'] = $containerStatusID;
-    $sample['OriginCenter']      =  $pscID;
-    $sample['CurrentCenter']     = $pscID;
+    $sample['OriginCenter']      = $centerID;
+    $sample['CurrentCenter']     = $centerID;
     $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
 
     // insert container (with parents)
@@ -254,15 +275,15 @@ function insertSample(array $tmRow, int $candID) : bool
     $containerID = insertContainer($tmLocation[$i], $sample, $containerID, true);
 
     // insert specimen
-    $specimenID = insertSpecimen($tmRow, $containerID, $candID, $sessionID);
+    $specimenID = insertSpecimen($tmRow, $containerID, $candID, $sessionID, $centerID);
 }
 
-/** 
- * insert explode a storage location in various container
+/**
+ * Insert explode a storage location in various container
  *
  * @param string $storageAdress from TM Oracle DB
  *
- * @return array the explode location 
+ * @return array the explode location
  */
 function explodeLocation(string $storageAdress) : array
 {
@@ -341,12 +362,12 @@ function explodeLocation(string $storageAdress) : array
     return $tmLocation;
 }
 
-/** 
- * update the information for a sample.
+/**
+ * Update the information for a sample.
  * check and modify as required:
  * - container location
  * - quantity
- * - freeze thaw cycle 
+ * - freeze thaw cycle
  *
  * @param array $tmRow row of data for Oracle DB
  *
@@ -354,51 +375,51 @@ function explodeLocation(string $storageAdress) : array
  */
 function updateSample(array $tmRow) : bool
 {
-
-    
-    $sql = "SELECT SpecimentID, Quantity, Barcode, FreezeThawCycle
+    $sql     = "SELECT SpecimentID, Quantity, Barcode, FreezeThawCycle
         FROM biobank_specimen bs
         JOIN biobank_container bc ON bs.ContainerID = bc.ContainerID
         LEFT JOIN biobank_specimen_freezethaw bsf ON bs.SpecimenID = bsf.SpecimenID
         WHERE bc.Barcode := barcode";
     $current = $DB->pselectOne($sql, array('barcode' => $tmRow['STORAGE_ADDRESS']));
 
-    if ($current['Quantity'] != $tmRow['QTY_ON_HAND']){
-        $DB->update('biobank_specimen',
+    if ($current['Quantity'] != $tmRow['QTY_ON_HAND']) {
+        $DB->update(
+            'biobank_specimen',
             array(
-                'Quantity' => $tmRow['QTY_ON_HAND'],
-                'UnitID'   => getUnitID($tmRow['QTY_UNITS'])
+             'Quantity' => $tmRow['QTY_ON_HAND'],
+             'UnitID'   => getUnitID($tmRow['QTY_UNITS'])
             ),
             array('SpecimenID' => $current['SpecimentID'])
         );
     }
 
-    if ($current['Barcode'] != $tmRow['STORAGE_ADDRESS']){
+    if ($current['Barcode'] != $tmRow['STORAGE_ADDRESS']) {
         //update location  TODO  need input from Sonia
-        $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS']);
-
+        $tmLocation = explodeLocation($tmRow['STORAGE_ADDRESS']);
     }
 
-    if ($current['FreezeThawCycle'] != $tmRow['FT_CYCLES']){
-        $DB->update('biobank_specimen_freezethaw',
+    if ($current['FreezeThawCycle'] != $tmRow['FT_CYCLES']) {
+        $DB->update(
+            'biobank_specimen_freezethaw',
             array('FreezeThawCycle' => $tmRow['FT_CYCLES']),
-            array('SpecimenID'      => $current['SpecimenID'])
+            array('SpecimenID' => $current['SpecimenID'])
         );
     }
-    
+
 }
 
-/** 
- * insert a container if it not already exist
+/**
+ * Insert a container if it not already exist
  * create the parent relation if applicable
  *
- * @param array $tmRow row of data for Oracle DB
- * @param int   $canID the candidate ID
- * @param int   $userID the userID of the person running the script
+ * @param array $container row of data for Oracle DB
+ * @param int   $sample    the candidate ID
+ * @param int   $parent    the userID of the person running the script
+ * @param int   $exclusif  
  *
  * @return int the ContainerID
  */
-function insertContainer($container, $sample, $parent = null, $exclusif = true) : int
+function insertContainer(array $container, $sample, $parent = null, $exclusif = true) : int
 {
     $DB =& \Database::singleton();
 
@@ -422,7 +443,7 @@ function insertContainer($container, $sample, $parent = null, $exclusif = true) 
         $sql,
         array(
          'Type'       => $container['type'],
-         'Descriptor' => $container['descriptor']
+         'Descriptor' => $container['descriptor'],
         )
     );
 
@@ -436,27 +457,29 @@ function insertContainer($container, $sample, $parent = null, $exclusif = true) 
         $DB->insert(
             'biobank_container_parent',
             array(
-             'ContainerID'       =>$ContainerID, 
+             'ContainerID'       => $ContainerID,
              'ParentContainerID' => $parent,
-             'Coordinate'        => $sample['location']
+             'Coordinate'        => $sample['location'],
             )
         );
     }
 }
 
-/** insert the specimen and related table information
+/**
+ * Insert the specimen and related table information
  * - freeze thaw cycle
  * - preparation
  * - collection
  *
- * @param array $tmRow row of data for Oracle DB
+ * @param array $tmRow       row of data for Oracle DB
  * @param int   $containerID the container in which the speciment is located
- * @param int   $canID the candidate ID
- * @param int   $sessionID the session at which the specimen was collected
+ * @param int   $candID      the candidate ID
+ * @param int   $sessionID   the session at which the specimen was collected
+ * @param int   $centerID    the ID of the center where the sample where collected
  *
  * @return int the specimenID
  */
-function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : int
+function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $centerID) : int
 {
     $DB =& \Database::singleton();
 
@@ -487,7 +510,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
             'biobank_specimen_freezethaw',
             array(
              'SpecimenID'      => $specimenID,
-             'FreezeThawCycle' => $tmRow['FT_CYCLES']
+             'FreezeThawCycle' => $tmRow['FT_CYCLES'],
             )
         );
     }
@@ -507,11 +530,10 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
         throw new LorisException('specimen_protocol inexistant'); // TODO to refine
     }
 
-    $specimenPrep['CenterID'] = 1; // TODO à revoir
-    $specimenPrep['Date']      = '20'.$tmRow['PREP_DATE'];  //yy-mm-dd
-    $specimenPrep['Time']      = '00:00:00';
-
-    $specimenPrep['JSON'] = getJson($tmRow, 'preparation');
+    $specimenPrep['CenterID'] = $centerID;
+    $specimenPrep['Date']     = '20'.$tmRow['PREP_DATE'];  //yy-mm-dd
+    $specimenPrep['Time']     = '00:00:00';
+    $specimenPrep['JSON']     = getJson($tmRow, 'preparation');
 
     $DB->insert('biobank_specimen_preparation', $specimenPrep);
 
@@ -520,22 +542,19 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
     $specimenColl['SpecimenID'] = $specimenID;
     $specimenColl['Quantity']   = $tmRow['QTY_ON_HAND'];
     $specimenColl['UnitID']     = $tmRow['QTY_UNITS'];
-    $specimenColl['CenterID'] = 1; // TODO à revoir
+    $specimenColl['CenterID']   = $centerID;
 
     $specimenColl['Date'] = '20'.$tmRow['COLLECTION_DATE'];
     $specimenColl['Time'] = '00:00:00';
-
-    $json = ''; //TODO
-
-    $specimenColl['JSON'] = $json;
+    $specimenColl['JSON'] = getJson($tmRow, 'collection');
 
     $DB->insert('biobank_specimen_collection', $specimenColl);
 
     return $specimenID;
 }
 
-/** 
- * get the ID of the mesurement unit in LorisDB
+/**
+ * Get the ID of the mesurement unit in LorisDB
  *
  * @param string $tmUnit the unit label in TM database
  *
@@ -543,7 +562,9 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID) : i
  */
 function getUnitID(string $tmUnit) : int
 {
-    $sql = "SELECT UnitID FROM biobank_unit WHERE Label := label";
+    $DB =& \Database::singleton();
+
+    $sql  = "SELECT UnitID FROM biobank_unit WHERE Label := label";
     $unit = $DB->pselectOne($sql, array('label' => $tmUnit));
     if ($unit === false) {
         throw new LorisException('TM quantity unit not found');
@@ -551,22 +572,26 @@ function getUnitID(string $tmUnit) : int
     return $unit;
 }
 
-/** 
- * create the json string with attributes for a category
+/**
+ * Create the json string with attributes for a category
  * ues global arrays for list of attributes to check and ID
  *
+ * @param array  $tmRow    row of data for Oracle DB
+ * @param string $category for which part of the sample json id being build
+ *                         preparation, collection
+ *
+ * @return $string json encoded values
  */
-
-function getJson(array $stRow, string $category) : string
+function getJson(array $tmRow, string $category) : string
 {
 
     global $jsonAttributes;
     global $jsonIDs;
 
     $json = array();
-    foreach ($jsonAttributes[$category] as $key => $label){
-        if ( isset($tmRow[$key]) && !empty(trim($tmRow[$key]))) {
-            $id = $jsonIDs[$label];
+    foreach ($jsonAttributes[$category] as $key => $label) {
+        if (isset($tmRow[$key]) && !empty(trim($tmRow[$key]))) {
+            $id        = $jsonIDs[$label];
             $json[$id] = trim($tmRow[$key]);
         }
     }
@@ -574,15 +599,20 @@ function getJson(array $stRow, string $category) : string
     return json_encode($json, JSON_NUMERIC_CHECK); //check format with Henry
 }
 
-/** 
- * get the ID to use in JSON attributes and populates global arrays
+/**
+ * Get the ID to use in JSON attributes and populates global arrays
+ *
+ * @param array $jsonAttributes the array with different attributes we need
+ *                              the IDs from the Loris DB
+ *
+ * @return array a hash with the ID for each attributes
  */
 function getJsonID(array $jsonAttributes) : array
 {
     $listOfAttributes = array();
     foreach ($jsonAttributes as $key => $val) {
         foreach ($val as $attribute) {
-           $listOfAttributes[] = $attribute; 
+            $listOfAttributes[] = $attribute;
         }
     }
     $listOfAttributes = array_unique($listOfAttributes);
@@ -591,7 +621,7 @@ function getJsonID(array $jsonAttributes) : array
     $DB     =& \Database::singleton();
 
     foreach ($listOfAttributes as $label) {
-        $sql = "SELECT SpecimenAttributeID 
+        $sql            = "SELECT SpecimenAttributeID 
             FROM biobank_specimen_attribute
             WHERE Label := label";
         $jsonID[$label] = $DB->pselectOne($sql, array('label' => $label));
@@ -600,4 +630,36 @@ function getJsonID(array $jsonAttributes) : array
     return $jsonID;
 }
 
+/**
+ * Create a new subproject with only the name
+ *
+ * @param string $subprojectName the name of the subproject
+ *
+ * @return int the subprojectID
+ */
+function insertSubproject(string $subprojectName) : int
+{
+    $DB =& \Database::singleton();
 
+    $subproject['title'] = $subprojectName;
+    $DB->insert('subproject', $subproject);
+    return $DB->getLastInsertId();
+}
+
+/**
+ * Create a new center in the psc table
+ *
+ * @param array $centerName an array containing
+ *                          - the name
+ *                          - alias
+ *                          - MRI_alias
+ *
+ * @return int the subprojectID
+ */
+function insertCenter(array $centerName) : int
+{
+    $DB =& \Database::singleton();
+
+    $DB->insert('psc', $centerName);
+    return $DB->getLastInsertId();
+}
