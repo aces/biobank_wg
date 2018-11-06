@@ -22,7 +22,7 @@
 //TODO list:
 // add candidate
 // update sample
-// qty_unit
+
 
 
 require_once __DIR__ ."/cred.inc";  //Oracle DB credential
@@ -265,15 +265,11 @@ function insertSample(array $tmRow, int $candID, $centerID) : bool
     $sample['CurrentCenter']     = $centerID;
     $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
 
-    // insert container (with parents)
-    $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS']);
-    $containerID = insertContainer($tmLocation[0], $sample, null, false);
-    $size        = count($tmLocation);
-    for ($i = 1; $i < $size - 1; $i++) {
-        $containerID = insertContainer($tmLocation[$i], $sample, $containerID, false);
-    }
+    // insert containers
+    $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
+    $containerID = insertContainerStack($tmLocation, $sample);
+    // insert the aliquot
     $containerID = insertContainer($tmLocation[$i], $sample, $containerID, true);
-
     // insert specimen
     $specimenID = insertSpecimen($tmRow, $containerID, $candID, $sessionID, $centerID);
 }
@@ -282,10 +278,11 @@ function insertSample(array $tmRow, int $candID, $centerID) : bool
  * Insert explode a storage location in various container
  *
  * @param string $storageAdress from TM Oracle DB
+ * @param string $barcode       barcode of the aliquot
  *
  * @return array the explode location
  */
-function explodeLocation(string $storageAdress) : array
+function explodeLocation(string $storageAdress, string $barcode) : array
 {
     $tmLocation    = array();
     $locationSplit = explode('-', $storageAdress);
@@ -324,7 +321,7 @@ function explodeLocation(string $storageAdress) : array
             $tmLocation[3]['location'] = substr($locationSplit[4], 1);
 
             $tmLocation[4]['type']     = 'Tube';
-            $tmLocation[4]['barcode']  = $storageAdress;
+            $tmLocation[4]['barcode']  = $barcode;
             $tmLocation[4]['location'] = $locationSplit[5];
             break;
 
@@ -349,7 +346,7 @@ function explodeLocation(string $storageAdress) : array
 
             $tmLocation[3]['descriptor'] = 'Cryotube';
             $tmLocation[3]['type']       = 'Tube';
-            $tmLocation[3]['barcode']    = $storageAdress;
+            $tmLocation[3]['barcode']    = $barcode;
             $tmLocation[3]['location']   = $locationSplit[5];
             break;
 
@@ -375,27 +372,69 @@ function explodeLocation(string $storageAdress) : array
  */
 function updateSample(array $tmRow) : bool
 {
-    $sql     = "SELECT SpecimentID, Quantity, Barcode, FreezeThawCycle
+    $sql     = "SELECT SpecimentID, Quantity, Barcode, FreezeThawCycle, bs.ContainerID AliquotID as bc2.Barcode as ParentBarcode
         FROM biobank_specimen bs
         JOIN biobank_container bc ON bs.ContainerID = bc.ContainerID
+        JOIN biobank_container_parent bcp on BC.ContainerID = bcp.ContainerID
+        JOIN biobank_container2 bc2 ON bcp.ParentContainerID = bc.ContainerID
         LEFT JOIN biobank_specimen_freezethaw bsf ON bs.SpecimenID = bsf.SpecimenID
         WHERE bc.Barcode := barcode";
-    $current = $DB->pselectOne($sql, array('barcode' => $tmRow['STORAGE_ADDRESS']));
+    $current = $DB->pselectCol($sql, array('barcode' => $tmRow['SAMPLE_NUMBER']));
 
     if ($current['Quantity'] != $tmRow['QTY_ON_HAND']) {
         $DB->update(
             'biobank_specimen',
             array(
              'Quantity' => $tmRow['QTY_ON_HAND'],
-             'UnitID'   => getUnitID($tmRow['QTY_UNITS'])
+             'UnitID'   => getUnitID($tmRow['QTY_UNITS']),
             ),
             array('SpecimenID' => $current['SpecimentID'])
         );
     }
 
-    if ($current['Barcode'] != $tmRow['STORAGE_ADDRESS']) {
-        //update location  TODO  need input from Sonia
-        $tmLocation = explodeLocation($tmRow['STORAGE_ADDRESS']);
+    $newParent     = substr($tmRow['STORAGE_ADDRESS'], 0, -4);
+    $newCoordinate = substr($tmRow['STORAGE_ADDRESS'], -3);
+    if ($current['ParentBarcode'] != $newParent) {
+        // check if new base container exist
+        // TODO
+        $sql = "SELECT bc.ContainerID
+            FROM biobank_container bc
+            WHERE bc.Barcode = :newParent";
+        $newParentContainerID = $DB->pselectOne(
+            $sql,
+            array('newParent' => $newParent)
+        );
+        if (empty($newParentContainerID)) {
+            $tmLocation           = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
+            $newParentContainerID = insertContainerStack(array $tmLocation, $sample);
+        } else {
+            //check if location is empty
+            $sql = "SELECT bc.ContainerID, bcp.ParentContainerID
+                FROM biobank_container bc
+                LEFT JOIN biobank_container_parent bcp
+                WHERE bc.Barcode = :newLocation
+                AND bcp.Coordinate = :coordinate";
+            $newParentContainer = $DB->pselectCol(
+                $sql,
+                array(
+                 'newLocation' => $newParent,
+                 'coordinate'  => $newCoordinate,
+                )
+            );
+            if (!empty($newParentContainer)) {
+                //coordinate occupied
+                throw new LorisException('new coordinate occupied'); //TODO to refine
+            }
+        }
+        // update aliquot location
+        $DB->update(
+            'biobank_container_parent',
+            array(
+             'ParentContainerID' => $newParentContainerID,
+             'Coordinate'        => $newCoordinate,
+            ),
+            array('ContainerID' => $current['AliquotID'])
+        );
     }
 
     if ($current['FreezeThawCycle'] != $tmRow['FT_CYCLES']) {
@@ -409,17 +448,39 @@ function updateSample(array $tmRow) : bool
 }
 
 /**
+ * Insert a parent container stack
+ * create a line of container starting with the freezer up to the aliquot
+ * as needed with the parent relation if applicable
+ *
+ * @param array $tmLocation row of data for Oracle DB
+ * @param int   $sample     the candidate ID
+ *
+ * @return int the ContainerID of the box
+ */
+function insertContainerStack(array $tmLocation, $sample) : int
+{
+    // top level container
+    $containerID = insertContainer($tmLocation[0], $sample, null, false);
+    // shelf, rack and box
+    $size = count($tmLocation);
+    for ($i = 1; $i < $size - 1; $i++) {
+        $containerID = insertContainer($tmLocation[$i], $sample, $containerID, false);
+    }
+    return = $containerID;
+}
+
+/**
  * Insert a container if it not already exist
  * create the parent relation if applicable
  *
  * @param array $container row of data for Oracle DB
  * @param int   $sample    the candidate ID
  * @param int   $parent    the userID of the person running the script
- * @param int   $exclusif  
+ * @param bool  $exclusive report an error if already exist
  *
  * @return int the ContainerID
  */
-function insertContainer(array $container, $sample, $parent = null, $exclusif = true) : int
+function insertContainer(array $container, $sample, $parent = null, $exclusive = true) : int
 {
     $DB =& \Database::singleton();
 
@@ -428,7 +489,7 @@ function insertContainer(array $container, $sample, $parent = null, $exclusif = 
     $exist = $DB->pselectOne($sql, array('barcode' => $container['barcode']));
 
     if ($exist !== null) {
-        if ($exclusif === true) {
+        if ($exclusive === true) {
             throw new LorisException('Barcode already taken');
         } else {
             return $exist;
