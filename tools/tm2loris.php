@@ -20,8 +20,8 @@
  */
 
 //TODO list:
-// add candidate
-// update sample
+// read csv file
+// foreach candidate in csv file, insert or update
 
 
 
@@ -66,7 +66,7 @@ if (!oci_execute($stid)) {
 }
 
 //insert default centerID
-$centerID = pselectOne(
+$centerID = pselectOne(    //TODO check if centerID or PSCID
     "SELECT CenterID FROM PSC
      WHERE Name = :centerName",
     array('Name' => $defaultCenterName['Name'])
@@ -75,58 +75,69 @@ if (!$centerID) {
     $centerID = insertCenter($defaultCenterName);
 }
 
-//get the list of ID for json attributes in LorisDB
+
+//get the list of ID for json attributes in LORIS DB
 $jsonIDs = getJsonID($jsonAttributes);
 
-$orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
-    PREP_DATE, PREP_BY, STORAGE_STATUS, INSTITUTION, COLLECTED_BY, QTY_UNITS,
-    SITE_OF_TISSUE, STORAGE_ADDRESS, QTY_ON_HAND, SAMPLE_CATEGORY, 
-    COLLECTION_DATE, SITE_CODE, S.COMMENTS, D.SEX, FILE1, DATE_OF_BIRTH,
-    s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME, e.EVENT_DATE, S.BANK_ID, BANK_NAME
-FROM TM_SAMPLES S 
-LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
-LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
-LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID";
+// get the list of candidate to process and process
+// csv format = TMID, LORISID
+if (($handle = fopen("test.csv", "r")) !== false) {
+    $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
+        PREP_DATE, PREP_BY, STORAGE_STATUS, INSTITUTION, COLLECTED_BY, QTY_UNITS,
+        SITE_OF_TISSUE, STORAGE_ADDRESS, QTY_ON_HAND, SAMPLE_CATEGORY, 
+        COLLECTION_DATE, SITE_CODE, S.COMMENTS, D.SEX, FILE1, DATE_OF_BIRTH,
+        s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME, e.EVENT_DATE, S.BANK_ID, BANK_NAME
+    FROM TM_SAMPLES S 
+    LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
+    LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
+    LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
+    WHERE s.SAMPLE_NUMBER = :tmID";
 
-$stid = oci_parse($orConn, $orQuery);
-oci_execute($stid);
-while (($tmRow = oci_fetch_assoc($stid)) != false) {
-    $candidate = array();
-
-    // check if sample already exist in Loris
-    $sampleExist = $DB->pselectOne(
-        "SELECT COUNT(ContainerID)
-         FROM biobank_container
-         WHERE Barcode = :barcode",
-        array(':barcode' => $tmRow['SAMPLE_NUMBER'])
-    );
-    if ($sampleExist != 0) {
-        updateSample($tmRow);
-    } else {
+    while (($data = fgetcsv($handle)) !== false) {
         // check if candidate exist
-        $candidate['PSCID']  = $tmRow['FILE1'] ?? "TMID_".$tmRow['DONOR_ID'];
-        $candidate['CandID'] = $DB->pselectOne(
+        $candidate = $DB->pselectOne(
             "SELECT CandID
              FROM candidate
-             WHERE PSCID = :pscid",
-            array(':pscid' => $candidate['PSCID'])
+             WHERE CandID = candID AND PSCID = :pscid",
+            array(
+             'CandID' => $data[1],
+             ':pscid' => $centerID,
+            )
         );
-        if (!$candidate['CandID']) {
-            $candidate['CandID'] = insertCandidate($tmRow, $candidate);
+        if (!$candidate) {
+            throw new LorisException('Candidate not define in LORIS'); //TODO to refine
         }
-        // check if session exist
-        $session['Visit_label'] = $tmRow['EVENT_NAME'];
-        $session['ID']          = $DB->pselectOne(
-            "SELECT ID
-             FROM session
-             WHERE CandID = :candID AND Visit_label = :visit",
-            array(':candID' => $candidate['PSCID'])
-        );
-        if (!$session['ID']) {
-            $session['ID'] = insertSession($tmRow, $candidate['CandID'], $userID, $centerID);
+
+        oci_bind_by_name($orQuery, "tmID", $data[0]);
+        $stid = oci_parse($orConn, $orQuery);
+        oci_execute($stid);
+        while (($tmRow = oci_fetch_assoc($stid)) != false) {
+            // check if sample already exist in Loris
+            $sampleExist = $DB->pselectOne(
+                "SELECT COUNT(ContainerID)
+                 FROM biobank_container
+                 WHERE Barcode = :barcode",
+                array(':barcode' => $tmRow['SAMPLE_NUMBER'])
+            );
+            if ($sampleExist != 0) {
+                updateSample($tmRow);
+            } else {
+                // check if session exist
+                $session['Visit_label'] = $tmRow['EVENT_NAME'];
+                $session['ID']          = $DB->pselectOne(
+                    "SELECT ID
+                     FROM session
+                     WHERE CandID = :candID AND Visit_label = :visit",
+                    array(':candID' => $candidate)
+                );
+                if (!$session['ID']) {
+                    $session['ID'] = insertSession($tmRow, $candidate, $userID, $centerID);
+                }
+                insertSample($DB, $tmRow, $candidate, $centerID);
+            }
         }
-        insertSample($DB, $tmRow, $candID, $centerID);
     }
+    fclose($handle);
 }
 
 /**
@@ -167,23 +178,6 @@ function showHelp()
     echo "information to be added or updated will be shown.\n";
 
     exit(1);
-}
-
-/**
- * Insert a candidate into LORIS
- * @param array $tmRow     row of data for Oracle DB
- * @param array $candidate row of data for Oracle DB
- *
- * @return void
- */
-function insertCandidate(array $tmRow, array &$candidate) : bool
-{
-    // wait for confirmation if needed   TODO waiting for CRU
-    $candidate['active']      = 'Y';
-    $candidate['CenterID']    = '';
-    $candidate['Testdate']    = ''; // from TM
-    $candidate['Entity_type'] = 'Human';
-
 }
 
 /**
@@ -396,7 +390,6 @@ function updateSample(array $tmRow) : bool
     $newCoordinate = substr($tmRow['STORAGE_ADDRESS'], -3);
     if ($current['ParentBarcode'] != $newParent) {
         // check if new base container exist
-        // TODO
         $sql = "SELECT bc.ContainerID
             FROM biobank_container bc
             WHERE bc.Barcode = :newParent";
@@ -406,7 +399,7 @@ function updateSample(array $tmRow) : bool
         );
         if (empty($newParentContainerID)) {
             $tmLocation           = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
-            $newParentContainerID = insertContainerStack(array $tmLocation, $sample);
+            $newParentContainerID = insertContainerStack($tmLocation, $sample);
         } else {
             //check if location is empty
             $sql = "SELECT bc.ContainerID, bcp.ParentContainerID
@@ -466,7 +459,7 @@ function insertContainerStack(array $tmLocation, $sample) : int
     for ($i = 1; $i < $size - 1; $i++) {
         $containerID = insertContainer($tmLocation[$i], $sample, $containerID, false);
     }
-    return = $containerID;
+    return $containerID;
 }
 
 /**
