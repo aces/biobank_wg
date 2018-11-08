@@ -66,10 +66,10 @@ if (!oci_execute($stid)) {
 }
 
 //insert default centerID
-$centerID = pselectOne(    //TODO check if centerID or PSCID
-    "SELECT CenterID FROM PSC
+$centerID = $DB->pselectOne(    //TODO check if centerID or PSCID
+    "SELECT CenterID FROM psc
      WHERE Name = :centerName",
-    array('Name' => $defaultCenterName['Name'])
+    array('centerName' => $defaultCenterName['Name'])
 );
 if (!$centerID) {
     $centerID = insertCenter($defaultCenterName);
@@ -81,35 +81,41 @@ $jsonIDs = getJsonID($jsonAttributes);
 
 // get the list of candidate to process and process
 // csv format = TMID, LORISID
-if (($handle = fopen("test.csv", "r")) !== false) {
+if (($handle = fopen("testcandidate.csv", "r")) !== false) {
     $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
-        PREP_DATE, PREP_BY, STORAGE_STATUS, INSTITUTION, COLLECTED_BY, QTY_UNITS,
-        SITE_OF_TISSUE, STORAGE_ADDRESS, QTY_ON_HAND, SAMPLE_CATEGORY, 
-        COLLECTION_DATE, SITE_CODE, S.COMMENTS, D.SEX, FILE1, DATE_OF_BIRTH,
-        s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME, e.EVENT_DATE, S.BANK_ID, BANK_NAME
+        to_char(PREP_DATE, 'YYYY-MM-DD') as PREP_DATE,
+        PREP_BY, STORAGE_STATUS, s.INSTITUTION, COLLECTED_BY, QTY_UNITS,
+        SITE_OF_TISSUE, STORAGE_ADDRESS, QTY_ON_HAND, SAMPLE_CATEGORY,
+        to_char(COLLECTION_DATE, 'YYYY-MM-DD') as COLLECTION_DATE, SITE_CODE,
+        S.COMMENTS, D.SEX, FILE1,
+        to_char(DATE_OF_BIRTH, 'YYYY-MM-DD') as DATE_OF_BIRTH,
+        s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME,
+        to_char(e.EVENT_DATE,'YYYY-MM-DD') as EVENT_DATE, S.BANK_ID, BANK_NAME
     FROM TM_SAMPLES S 
     LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
     LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
-    WHERE s.SAMPLE_NUMBER = :tmID";
+    WHERE s.DONOR_ID = :tmID";
+    $stid = oci_parse($orConn, $orQuery);
 
     while (($data = fgetcsv($handle)) !== false) {
         // check if candidate exist
         $candidate = $DB->pselectOne(
             "SELECT CandID
              FROM candidate
-             WHERE CandID = candID AND PSCID = :pscid",
+             WHERE CandID = :candID AND CenterID = :centerID",
             array(
-             'CandID' => $data[1],
-             ':pscid' => $centerID,
+             'candID' => $data[1],
+             'centerID' => $centerID,
             )
         );
+
+
         if (!$candidate) {
             throw new LorisException('Candidate not define in LORIS'); //TODO to refine
         }
 
-        oci_bind_by_name($orQuery, "tmID", $data[0]);
-        $stid = oci_parse($orConn, $orQuery);
+        oci_bind_by_name($stid, ":tmID", $data[0]);
         oci_execute($stid);
         while (($tmRow = oci_fetch_assoc($stid)) != false) {
             // check if sample already exist in Loris
@@ -128,13 +134,19 @@ if (($handle = fopen("test.csv", "r")) !== false) {
                     "SELECT ID
                      FROM session
                      WHERE CandID = :candID AND Visit_label = :visit",
-                    array(':candID' => $candidate)
+                    array(
+                     ':candID' => $candidate,
+                     ':visit' => $session['Visit_label'],
+                    )
                 );
                 if (!$session['ID']) {
                     $session['ID'] = insertSession($tmRow, $candidate, $userID, $centerID);
                 }
-                insertSample($DB, $tmRow, $candidate, $centerID);
+                if (substr($tmRow['STORAGE_ADDRESS'],0,7) != 'VIRTUAL'){
+                    insertSample($tmRow, $candidate, $centerID, $session['ID']);
+                }
             }
+        unset($tmRow);
         }
     }
     fclose($handle);
@@ -188,9 +200,8 @@ function showHelp()
  * @param int   $userID   the userID of the person running the script
  * @param int   $centerID the ID of the center where the sample where collected
  *
- * @return bool succes of the insertion
  */
-function insertSession($tmRow, $candID, $userID, $centerID) : bool
+function insertSession($tmRow, $candID, $userID, $centerID)
 {
     $DB =& \Database::singleton();
 
@@ -212,58 +223,65 @@ function insertSession($tmRow, $candID, $userID, $centerID) : bool
     $session['CenterID']          = $centerID;
     $session['Active']            = 'Y';
     $session['UserID']            = $userID;
-    $session['Hardcopy-request']  = '-';
+    $session['Hardcopy_request']  = '-';
     $session['MRIQCStatus']       = '';
     $session['MRIQCPending']      = 'N';
     $session['MRICaveat']         = 'false';
     $session['Visit_label']       = $tmRow['EVENT_NAME'];
     $session['Submitted']         = 'N';
     $session['Current_stage']     = 'visit';
-    $session['Data_stage_change'] = $today;
+    $session['Date_stage_change'] = $today;
     $session['date_registered']   = $today;
     $session['scan_done']         = 'N';
-    $session['Date_active']       =  substr($tmRow['EVENT_DATE'], 0, 1) == 9
+    $session['Date_active']       = $tmRow['EVENT_DATE'];
+//var_dump($tmRow['EVENT_DATE']);
+/*    $session['Date_active']       =  substr($tmRow['EVENT_DATE'], 0, 1) == 9
         ? '19'.$tmRow['EVENT_DATE'] : '20'.$tmRow['EVENT_DATE'];
 
     if (!empty($tmRow['PREP_BY']) && trim($tmRow['PREP_BY']) != '') {
         $session['RegisteredBy'] = trim($tmRow['PREP_BY']);
     } else {
         $session['RegisteredBy'] = $userID;
-    }
+    }*/
+
+//var_dump($session);
 
     $DB->insert("session", $session);
-    return getLastInsertID();
+    return $DB->getLastInsertID();
 }
 
 /**
  * Insert a sample and location. Build the container as required
  *
- * @param array $tmRow    row of data for Oracle DB
- * @param int   $candID   the candidate ID
- * @param int   $centerID the ID of the center where the sample where collected
+ * @param array $tmRow     row of data for Oracle DB
+ * @param int   $candID    the candidate ID
+ * @param int   $centerID  the ID of the center where the sample where collected
+ * @param int   $sessionID the ID of the session
  *
  * @return bool succes of the insertion
  */
-function insertSample(array $tmRow, int $candID, $centerID) : bool
+function insertSample(array $tmRow, int $candID, $centerID, $sessionID)
 {
     $DB =& \Database::singleton();
 
-    $sql = 'SELECT ContainerStatutID
+    $sql = 'SELECT ContainerStatusID
             FROM biobank_container_status
             WHERE Label = "Available"';
     $containerStatusID = $DB->pselectOne($sql, array());
 
     $sample = array();
     $sample['ContainerStatusID'] = $containerStatusID;
-    $sample['OriginCenter']      = $centerID;
-    $sample['CurrentCenter']     = $centerID;
+    $sample['OriginCenterID']    = $centerID;
+    $sample['CurrentCenterID']   = $centerID;
     $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
 
     // insert containers
+var_dump($tmRow['STORAGE_ADDRESS']);
     $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
     $containerID = insertContainerStack($tmLocation, $sample);
     // insert the aliquot
-    $containerID = insertContainer($tmLocation[$i], $sample, $containerID, true);
+    $index = sizeof($tmLocation)-1;
+    $containerID = insertContainer($tmLocation[$index], $sample, $containerID, true);
     // insert specimen
     $specimenID = insertSpecimen($tmRow, $containerID, $candID, $sessionID, $centerID);
 }
@@ -280,7 +298,9 @@ function explodeLocation(string $storageAdress, string $barcode) : array
 {
     $tmLocation    = array();
     $locationSplit = explode('-', $storageAdress);
-    switch (substring($locationSplit[1], 0, 3)) {
+var_dump($locationSplit);
+echo substr($locationSplit[0], 0, 3);
+    switch (substr($locationSplit[0], 0, 3)) {
         case 'FRZ':
             if ((int)substr($locationSplit[1], 3) < 9) {
                 $tmLocation[0]['descriptor'] = '5 Shelf';
@@ -300,17 +320,17 @@ function explodeLocation(string $storageAdress, string $barcode) : array
             $tmLocation[0]['location'] = substr($locationSplit[1], 3);
 
             $tmLocation[1]['type']     = 'Shelf';
-            $tmLocation[1]['barcode']  = $tmLocation[0]['value'].'-'.
+            $tmLocation[1]['barcode']  = $tmLocation[0]['barcode'].'-'.
                 substr($locationSplit[2], 1);
             $tmLocation[1]['location'] = substr($locationSplit[2], 1);
 
             $tmLocation[2]['type']     = 'Rack';
-            $tmLocation[2]['barcode']  = $tmLocation[1]['value'].'-'.
+            $tmLocation[2]['barcode']  = $tmLocation[1]['barcode'].'-'.
                 substr($locationSplit[3], 1);
             $tmLocation[2]['location'] = substr($locationSplit[3], 1);
 
             $tmLocation[3]['type']     = 'Matrix Box';
-            $tmLocation[3]['barcode']  = $tmLocation[2]['value'].'-'.
+            $tmLocation[3]['barcode']  = $tmLocation[2]['barcode'].'-'.
                 substr($locationSplit[4], 1);
             $tmLocation[3]['location'] = substr($locationSplit[4], 1);
 
@@ -328,13 +348,13 @@ function explodeLocation(string $storageAdress, string $barcode) : array
 
             $tmLocation[1]['descriptor'] = '13 box';
             $tmLocation[1]['type']       = 'Rack';
-            $tmLocation[1]['barcode']    = $tmLocation[0]['value'].'-'.
+            $tmLocation[1]['barcode']    = $tmLocation[0]['barcode'].'-'.
                 substr($locationSplit[3], 1);
             $tmLocation[1]['location']   = substr($locationSplit[3], 1);
 
             $tmLocation[2]['descriptor'] = '10x10';
             $tmLocation[2]['type']       = 'Matrix Box';
-            $tmLocation[2]['barcode']    = $tmLocation[1]['value'].'-'.
+            $tmLocation[2]['barcode']    = $tmLocation[1]['barcode'].'-'.
                 substr($locationSplit[4], 1);
             $tmLocation[2]['location']   = substr($locationSplit[4], 1);
 
@@ -349,7 +369,8 @@ function explodeLocation(string $storageAdress, string $barcode) : array
             break;
         default:
     }
-
+echo "tmLocation at end of explodeLocation\n";
+var_dump($tmLocation);
     return $tmLocation;
 }
 
@@ -364,17 +385,21 @@ function explodeLocation(string $storageAdress, string $barcode) : array
  *
  * @return bool succes of the insertion
  */
-function updateSample(array $tmRow) : bool
+function updateSample(array $tmRow)
 {
-    $sql     = "SELECT SpecimentID, Quantity, Barcode, FreezeThawCycle, bs.ContainerID AliquotID as bc2.Barcode as ParentBarcode
+    $DB =& \Database::singleton();
+
+    $sql     = "SELECT bs.SpecimenID, bs.Quantity, bc.Barcode, FreezeThawCycle,
+            bs.ContainerID as AliquotID, bc2.Barcode as ParentBarcode
         FROM biobank_specimen bs
         JOIN biobank_container bc ON bs.ContainerID = bc.ContainerID
-        JOIN biobank_container_parent bcp on BC.ContainerID = bcp.ContainerID
-        JOIN biobank_container2 bc2 ON bcp.ParentContainerID = bc.ContainerID
+        JOIN biobank_container_parent bcp on bc.ContainerID = bcp.ContainerID
+        JOIN biobank_container bc2 ON bcp.ParentContainerID = bc2.ContainerID
         LEFT JOIN biobank_specimen_freezethaw bsf ON bs.SpecimenID = bsf.SpecimenID
-        WHERE bc.Barcode := barcode";
+        WHERE bc.Barcode = :barcode";
     $current = $DB->pselectCol($sql, array('barcode' => $tmRow['SAMPLE_NUMBER']));
 
+var_dump($current);
     if ($current['Quantity'] != $tmRow['QTY_ON_HAND']) {
         $DB->update(
             'biobank_specimen',
@@ -452,6 +477,8 @@ function updateSample(array $tmRow) : bool
  */
 function insertContainerStack(array $tmLocation, $sample) : int
 {
+echo "start of insertContainerStack\n";
+var_dump($tmLocation);
     // top level container
     $containerID = insertContainer($tmLocation[0], $sample, null, false);
     // shelf, rack and box
@@ -478,10 +505,11 @@ function insertContainer(array $container, $sample, $parent = null, $exclusive =
     $DB =& \Database::singleton();
 
     //check if already exist
-    $sql   = "SELECT ContainerID FROM biobank_container WHERE Barcode := barcode";
+    $sql   = "SELECT ContainerID FROM biobank_container WHERE Barcode = :barcode";
     $exist = $DB->pselectOne($sql, array('barcode' => $container['barcode']));
 
-    if ($exist !== null) {
+    if (!empty($exist)) {
+var_dump($exist);
         if ($exclusive === true) {
             throw new LorisException('Barcode already taken');
         } else {
@@ -492,11 +520,11 @@ function insertContainer(array $container, $sample, $parent = null, $exclusive =
     //not existant, add
     $sql = 'SELECT ContainerTypeID
             FROM biobank_container_type
-            WHERE Type := type and Descriptor := Descriptor';
-    $containerTypeID = pselectOne(
+            WHERE Type = :type and Descriptor = :Descriptor';
+    $containerTypeID = $DB->pselectOne(
         $sql,
         array(
-         'Type'       => $container['type'],
+         'type'       => $container['type'],
          'Descriptor' => $container['descriptor'],
         )
     );
@@ -511,12 +539,13 @@ function insertContainer(array $container, $sample, $parent = null, $exclusive =
         $DB->insert(
             'biobank_container_parent',
             array(
-             'ContainerID'       => $ContainerID,
+             'ContainerID'       => $containerID,
              'ParentContainerID' => $parent,
-             'Coordinate'        => $sample['location'],
+             'Coordinate'        => $container['location'],
             )
         );
     }
+    return $containerID;
 }
 
 /**
@@ -544,15 +573,16 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $ce
 
     $sql = 'SELECT SpecimenTypeID
          FROM biobank_specimen_type
-         WHERE Label := lable';
+         WHERE Label = :label';
     $specimen['SpecimenTypeID'] = $DB->pselectOne(
         $sql,
-        array('Label' => $tmRow['SAMPLE_TYPE'])
+        array('label' => $tmRow['SAMPLE_TYPE'])
     );
-    if ($specimenTypeID === null) {
+    if ($specimen['SpecimenTypeID'] === null) {
         throw new LorisException('invalid specimen type'); //TODO to refine
     }
     $specimen['Quantity'] = $tmRow['QTY_ON_HAND'];
+var_dump($tmRow['QTY_UNITS']);
     $specimen['UnitID']   = getUnitID($tmRow['QTY_UNITS']);
 
     $DB->insert('biobank_specimen', $specimen);
@@ -575,7 +605,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $ce
 
     $sql = 'SELECT SpecimenProtocolID
         FROM biobank_specimen_protocol
-        WHERE Label := label';
+        WHERE Label = :label';
     $specimenPrep['SpecimenProtocolID'] = $DB->pselectOne(
         $sql,
         array('label' => $tmRow['SAMPLE_CATEGORY'])
@@ -585,9 +615,9 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $ce
     }
 
     $specimenPrep['CenterID'] = $centerID;
-    $specimenPrep['Date']     = '20'.$tmRow['PREP_DATE'];  //yy-mm-dd
+    $specimenPrep['Date']     = $tmRow['PREP_DATE'];  
     $specimenPrep['Time']     = '00:00:00';
-    $specimenPrep['JSON']     = getJson($tmRow, 'preparation');
+    $specimenPrep['Data']     = getJson($tmRow, 'preparation');
 
     $DB->insert('biobank_specimen_preparation', $specimenPrep);
 
@@ -595,13 +625,14 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $ce
     $specimenColl = array();
     $specimenColl['SpecimenID'] = $specimenID;
     $specimenColl['Quantity']   = $tmRow['QTY_ON_HAND'];
-    $specimenColl['UnitID']     = $tmRow['QTY_UNITS'];
+    $specimenColl['UnitID']     = getUnitID($tmRow['QTY_UNITS']);
     $specimenColl['CenterID']   = $centerID;
 
-    $specimenColl['Date'] = '20'.$tmRow['COLLECTION_DATE'];
+    $specimenColl['Date'] = $tmRow['COLLECTION_DATE'];
     $specimenColl['Time'] = '00:00:00';
-    $specimenColl['JSON'] = getJson($tmRow, 'collection');
+    $specimenColl['Data'] = getJson($tmRow, 'collection');
 
+var_dump($specimenColl);
     $DB->insert('biobank_specimen_collection', $specimenColl);
 
     return $specimenID;
@@ -618,11 +649,13 @@ function getUnitID(string $tmUnit) : int
 {
     $DB =& \Database::singleton();
 
-    $sql  = "SELECT UnitID FROM biobank_unit WHERE Label := label";
+var_dump($tmUnit);
+    $sql  = "SELECT UnitID FROM biobank_unit WHERE Label = :label";
     $unit = $DB->pselectOne($sql, array('label' => $tmUnit));
     if ($unit === false) {
         throw new LorisException('TM quantity unit not found');
     }
+var_dump($unit);
     return $unit;
 }
 
@@ -641,11 +674,16 @@ function getJson(array $tmRow, string $category) : string
 
     global $jsonAttributes;
     global $jsonIDs;
-
+var_dump($tmRow);
+var_dump($jsonAttributes);
+var_dump($jsonIDs);
+echo $category."\n";
     $json = array();
     foreach ($jsonAttributes[$category] as $key => $label) {
         if (isset($tmRow[$key]) && !empty(trim($tmRow[$key]))) {
             $id        = $jsonIDs[$label];
+var_dump($jsonIDs[$label]);
+echo $id."\n";
             $json[$id] = trim($tmRow[$key]);
         }
     }
@@ -677,7 +715,7 @@ function getJsonID(array $jsonAttributes) : array
     foreach ($listOfAttributes as $label) {
         $sql            = "SELECT SpecimenAttributeID 
             FROM biobank_specimen_attribute
-            WHERE Label := label";
+            WHERE Label = :label";
         $jsonID[$label] = $DB->pselectOne($sql, array('label' => $label));
     }
 
