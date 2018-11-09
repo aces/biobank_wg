@@ -20,9 +20,8 @@
  */
 
 //TODO list:
-// read csv file
-// foreach candidate in csv file, insert or update
-
+// adjust reading csv (excel?) file as needed
+// test and debug sampleUpdate
 
 
 require_once __DIR__ ."/cred.inc";  //Oracle DB credential
@@ -42,6 +41,7 @@ $DB =& \Database::singleton();
 
 //check user credential
 $userPWD = readlineTerminal("\nPlease enter your LORIS password");
+echo "\n";
 $auth    = new SinglePointLogin;
 
 if (!$auth->passwordAuthenticate($userID, $userPWD, false)) {
@@ -51,7 +51,7 @@ if (!$auth->passwordAuthenticate($userID, $userPWD, false)) {
 
 
 // connect to the Oracle DB
-$orConn = oci_connect($user, $passwd, $service);
+$orConn = oci_connect($user, $passwd, $service, 'AL32UTF8');
 if (!$orConn) {
     $e = oci_error();
     print "Error!: " . $e->getMessage();
@@ -234,17 +234,6 @@ function insertSession($tmRow, $candID, $userID, $centerID)
     $session['date_registered']   = $today;
     $session['scan_done']         = 'N';
     $session['Date_active']       = $tmRow['EVENT_DATE'];
-//var_dump($tmRow['EVENT_DATE']);
-/*    $session['Date_active']       =  substr($tmRow['EVENT_DATE'], 0, 1) == 9
-        ? '19'.$tmRow['EVENT_DATE'] : '20'.$tmRow['EVENT_DATE'];
-
-    if (!empty($tmRow['PREP_BY']) && trim($tmRow['PREP_BY']) != '') {
-        $session['RegisteredBy'] = trim($tmRow['PREP_BY']);
-    } else {
-        $session['RegisteredBy'] = $userID;
-    }*/
-
-//var_dump($session);
 
     $DB->insert("session", $session);
     return $DB->getLastInsertID();
@@ -276,7 +265,6 @@ function insertSample(array $tmRow, int $candID, $centerID, $sessionID)
     $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
 
     // insert containers
-var_dump($tmRow['STORAGE_ADDRESS']);
     $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
     $containerID = insertContainerStack($tmLocation, $sample);
     // insert the aliquot
@@ -298,8 +286,6 @@ function explodeLocation(string $storageAdress, string $barcode) : array
 {
     $tmLocation    = array();
     $locationSplit = explode('-', $storageAdress);
-var_dump($locationSplit);
-echo substr($locationSplit[0], 0, 3);
     switch (substr($locationSplit[0], 0, 3)) {
         case 'FRZ':
             if ((int)substr($locationSplit[1], 3) < 9) {
@@ -316,52 +302,51 @@ echo substr($locationSplit[0], 0, 3);
                 $tmLocation[4]['descriptor'] = 'Cryotube';
             }
             $tmLocation[0]['type']     = 'Freezer';
-            $tmLocation[0]['barcode']  = $locationSplit[1];
-            $tmLocation[0]['location'] = substr($locationSplit[1], 3);
+            $tmLocation[0]['barcode']  = $locationSplit[0];
+            $tmLocation[0]['location'] = substr($locationSplit[0], 3);
 
             $tmLocation[1]['type']     = 'Shelf';
             $tmLocation[1]['barcode']  = $tmLocation[0]['barcode'].'-'.
-                substr($locationSplit[2], 1);
-            $tmLocation[1]['location'] = substr($locationSplit[2], 1);
+                substr($locationSplit[1], 1);
+            $tmLocation[1]['location'] = substr($locationSplit[1], 1);
 
             $tmLocation[2]['type']     = 'Rack';
             $tmLocation[2]['barcode']  = $tmLocation[1]['barcode'].'-'.
-                substr($locationSplit[3], 1);
-            $tmLocation[2]['location'] = substr($locationSplit[3], 1);
+                substr($locationSplit[2], 1);
+            $tmLocation[2]['location'] = substr($locationSplit[2], 1);
 
             $tmLocation[3]['type']     = 'Matrix Box';
             $tmLocation[3]['barcode']  = $tmLocation[2]['barcode'].'-'.
-                substr($locationSplit[4], 1);
-            $tmLocation[3]['location'] = substr($locationSplit[4], 1);
+                substr($locationSplit[3], 1);
+            $tmLocation[3]['location'] = substr($locationSplit[3], 1);
 
             $tmLocation[4]['type']     = 'Tube';
             $tmLocation[4]['barcode']  = $barcode;
-            $tmLocation[4]['location'] = $locationSplit[5];
+            $tmLocation[4]['location'] = $locationSplit[4];
             break;
 
         case 'CRY':
             $tmLocation[0]['descriptor'] = '14 rack tank';
             $tmLocation[0]['type']       = 'CryoTank';
-            $tmLocation[0]['barcode']    = $locationSplit[0].'-'.
-                $locationSplit[1];
-            $tmLocation[0]['location']   = $locationSplit[2];
+            $tmLocation[0]['barcode']    = 'CRYO-'.$locationSplit[1];
+            $tmLocation[0]['location']   = $locationSplit[1];
 
             $tmLocation[1]['descriptor'] = '13 box';
             $tmLocation[1]['type']       = 'Rack';
             $tmLocation[1]['barcode']    = $tmLocation[0]['barcode'].'-'.
-                substr($locationSplit[3], 1);
-            $tmLocation[1]['location']   = substr($locationSplit[3], 1);
+                substr($locationSplit[2], 1);
+            $tmLocation[1]['location']   = substr($locationSplit[2], 1);
 
             $tmLocation[2]['descriptor'] = '10x10';
             $tmLocation[2]['type']       = 'Matrix Box';
             $tmLocation[2]['barcode']    = $tmLocation[1]['barcode'].'-'.
-                substr($locationSplit[4], 1);
-            $tmLocation[2]['location']   = substr($locationSplit[4], 1);
+                substr($locationSplit[3], 1);
+            $tmLocation[2]['location']   = substr($locationSplit[3], 1);
 
             $tmLocation[3]['descriptor'] = 'Cryotube';
             $tmLocation[3]['type']       = 'Tube';
             $tmLocation[3]['barcode']    = $barcode;
-            $tmLocation[3]['location']   = $locationSplit[5];
+            $tmLocation[3]['location']   = $locationSplit[4];
             break;
 
         case 'VIR':
@@ -369,8 +354,6 @@ echo substr($locationSplit[0], 0, 3);
             break;
         default:
     }
-echo "tmLocation at end of explodeLocation\n";
-var_dump($tmLocation);
     return $tmLocation;
 }
 
@@ -399,7 +382,6 @@ function updateSample(array $tmRow)
         WHERE bc.Barcode = :barcode";
     $current = $DB->pselectCol($sql, array('barcode' => $tmRow['SAMPLE_NUMBER']));
 
-var_dump($current);
     if ($current['Quantity'] != $tmRow['QTY_ON_HAND']) {
         $DB->update(
             'biobank_specimen',
@@ -423,8 +405,8 @@ var_dump($current);
             array('newParent' => $newParent)
         );
         if (empty($newParentContainerID)) {
-            $tmLocation           = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
-            $newParentContainerID = insertContainerStack($tmLocation, $sample);
+           $tmLocation           = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
+           $newParentContainerID = insertContainerStack($tmLocation, $sample);
         } else {
             //check if location is empty
             $sql = "SELECT bc.ContainerID, bcp.ParentContainerID
@@ -477,8 +459,6 @@ var_dump($current);
  */
 function insertContainerStack(array $tmLocation, $sample) : int
 {
-echo "start of insertContainerStack\n";
-var_dump($tmLocation);
     // top level container
     $containerID = insertContainer($tmLocation[0], $sample, null, false);
     // shelf, rack and box
@@ -509,7 +489,6 @@ function insertContainer(array $container, $sample, $parent = null, $exclusive =
     $exist = $DB->pselectOne($sql, array('barcode' => $container['barcode']));
 
     if (!empty($exist)) {
-var_dump($exist);
         if ($exclusive === true) {
             throw new LorisException('Barcode already taken');
         } else {
@@ -582,7 +561,6 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $ce
         throw new LorisException('invalid specimen type'); //TODO to refine
     }
     $specimen['Quantity'] = $tmRow['QTY_ON_HAND'];
-var_dump($tmRow['QTY_UNITS']);
     $specimen['UnitID']   = getUnitID($tmRow['QTY_UNITS']);
 
     $DB->insert('biobank_specimen', $specimen);
@@ -610,7 +588,7 @@ var_dump($tmRow['QTY_UNITS']);
         $sql,
         array('label' => $tmRow['SAMPLE_CATEGORY'])
     );
-    if ($specimenPrep['SpecimenProtocolID'] === null) {
+    if (empty($specimenPrep['SpecimenProtocolID'])) {
         throw new LorisException('specimen_protocol inexistant'); // TODO to refine
     }
 
@@ -632,7 +610,6 @@ var_dump($tmRow['QTY_UNITS']);
     $specimenColl['Time'] = '00:00:00';
     $specimenColl['Data'] = getJson($tmRow, 'collection');
 
-var_dump($specimenColl);
     $DB->insert('biobank_specimen_collection', $specimenColl);
 
     return $specimenID;
@@ -649,13 +626,11 @@ function getUnitID(string $tmUnit) : int
 {
     $DB =& \Database::singleton();
 
-var_dump($tmUnit);
     $sql  = "SELECT UnitID FROM biobank_unit WHERE Label = :label";
     $unit = $DB->pselectOne($sql, array('label' => $tmUnit));
     if ($unit === false) {
         throw new LorisException('TM quantity unit not found');
     }
-var_dump($unit);
     return $unit;
 }
 
@@ -674,21 +649,16 @@ function getJson(array $tmRow, string $category) : string
 
     global $jsonAttributes;
     global $jsonIDs;
-var_dump($tmRow);
-var_dump($jsonAttributes);
-var_dump($jsonIDs);
-echo $category."\n";
     $json = array();
     foreach ($jsonAttributes[$category] as $key => $label) {
         if (isset($tmRow[$key]) && !empty(trim($tmRow[$key]))) {
             $id        = $jsonIDs[$label];
-var_dump($jsonIDs[$label]);
-echo $id."\n";
-            $json[$id] = trim($tmRow[$key]);
+            if (!empty($id)) {
+                $json[$id] = trim($tmRow[$key]);
+            }
         }
     }
-
-    return json_encode($json, JSON_NUMERIC_CHECK); //check format with Henry
+    return json_encode($json); //check format with Henry
 }
 
 /**
