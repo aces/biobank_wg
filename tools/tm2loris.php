@@ -21,7 +21,7 @@
 
 //TODO list:
 // adjust reading csv (excel?) file as needed
-// test and debug sampleUpdate
+// fix json_encode
 
 
 require_once __DIR__ ."/cred.inc";  //Oracle DB credential
@@ -126,7 +126,7 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
                 array(':barcode' => $tmRow['SAMPLE_NUMBER'])
             );
             if ($sampleExist != 0) {
-                updateSample($tmRow);
+                updateSample($tmRow, $centerID);
             } else {
                 // check if session exist
                 $session['Visit_label'] = $tmRow['EVENT_NAME'];
@@ -368,7 +368,7 @@ function explodeLocation(string $storageAdress, string $barcode) : array
  *
  * @return bool succes of the insertion
  */
-function updateSample(array $tmRow)
+function updateSample(array $tmRow, $centerID)
 {
     $DB =& \Database::singleton();
 
@@ -380,8 +380,9 @@ function updateSample(array $tmRow)
         JOIN biobank_container bc2 ON bcp.ParentContainerID = bc2.ContainerID
         LEFT JOIN biobank_specimen_freezethaw bsf ON bs.SpecimenID = bsf.SpecimenID
         WHERE bc.Barcode = :barcode";
-    $current = $DB->pselectCol($sql, array('barcode' => $tmRow['SAMPLE_NUMBER']));
+    $current = $DB->pselectRow($sql, array('barcode' => $tmRow['SAMPLE_NUMBER']));
 
+    // check quantity and update if needed
     if ($current['Quantity'] != $tmRow['QTY_ON_HAND']) {
         $DB->update(
             'biobank_specimen',
@@ -389,10 +390,11 @@ function updateSample(array $tmRow)
              'Quantity' => $tmRow['QTY_ON_HAND'],
              'UnitID'   => getUnitID($tmRow['QTY_UNITS']),
             ),
-            array('SpecimenID' => $current['SpecimentID'])
+            array('SpecimenID' => $current['SpecimenID'])
         );
     }
 
+    // check location and update if needed
     $newParent     = substr($tmRow['STORAGE_ADDRESS'], 0, -4);
     $newCoordinate = substr($tmRow['STORAGE_ADDRESS'], -3);
     if ($current['ParentBarcode'] != $newParent) {
@@ -405,8 +407,19 @@ function updateSample(array $tmRow)
             array('newParent' => $newParent)
         );
         if (empty($newParentContainerID)) {
-           $tmLocation           = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
-           $newParentContainerID = insertContainerStack($tmLocation, $sample);
+            $sql = 'SELECT ContainerStatusID
+                FROM biobank_container_status
+                WHERE Label = "Available"';
+            $containerStatusID = $DB->pselectOne($sql, array());
+    
+            $sample = array();
+            $sample['ContainerStatusID'] = $containerStatusID;
+            $sample['OriginCenterID']    = $centerID;
+            $sample['CurrentCenterID']   = $centerID;
+            $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
+
+            $tmLocation           = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
+            $newParentContainerID = insertContainerStack($tmLocation, $sample);
         } else {
             //check if location is empty
             $sql = "SELECT bc.ContainerID, bcp.ParentContainerID
@@ -437,11 +450,14 @@ function updateSample(array $tmRow)
         );
     }
 
-    if ($current['FreezeThawCycle'] != $tmRow['FT_CYCLES']) {
-        $DB->update(
+    // check FreezeThawCycle and update if needed
+    if ($tmRow['FT_CYCLES'] != 0 && ( $current['FreezeThawCycle'] != $tmRow['FT_CYCLES'])) {
+        $DB->replace(
             'biobank_specimen_freezethaw',
-            array('FreezeThawCycle' => $tmRow['FT_CYCLES']),
-            array('SpecimenID' => $current['SpecimenID'])
+            array(
+             'SpecimenID' => $current['SpecimenID'],
+             'FreezeThawCycle' => $tmRow['FT_CYCLES'],
+            )
         );
     }
 
@@ -567,7 +583,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $ce
     $specimenID = $DB->getLastInsertID();
 
     // freezethaw
-    if (is_int($tmRow['FT_CYCLES'])) {
+    if (is_int($tmRow['FT_CYCLES']) && $tmRow['FT_CYCLES'] != 0) {
         $DB->insert(
             'biobank_specimen_freezethaw',
             array(
