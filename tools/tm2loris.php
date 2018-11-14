@@ -42,7 +42,7 @@ $DB =& \Database::singleton();
 //check user credential
 $userPWD = readlineTerminal("\nPlease enter your LORIS password");
 echo "\n";
-$auth    = new SinglePointLogin;
+$auth = new SinglePointLogin;
 
 if (!$auth->passwordAuthenticate($userID, $userPWD, false)) {
     echo "\nInvalid userID, password combination\n";
@@ -96,7 +96,7 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
     LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
     WHERE s.DONOR_ID = :tmID";
-    $stid = oci_parse($orConn, $orQuery);
+    $stid    = oci_parse($orConn, $orQuery);
 
     while (($data = fgetcsv($handle)) !== false) {
         // check if candidate exist
@@ -105,7 +105,7 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
              FROM candidate
              WHERE CandID = :candID AND CenterID = :centerID",
             array(
-             'candID' => $data[1],
+             'candID'   => $data[1],
              'centerID' => $centerID,
             )
         );
@@ -136,17 +136,22 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
                      WHERE CandID = :candID AND Visit_label = :visit",
                     array(
                      ':candID' => $candidate,
-                     ':visit' => $session['Visit_label'],
+                     ':visit'  => $session['Visit_label'],
                     )
                 );
                 if (!$session['ID']) {
-                    $session['ID'] = insertSession($tmRow, $candidate, $userID, $centerID);
+                    $session['ID'] = insertSession(
+                        $tmRow,
+                        $candidate,
+                        $userID,
+                        $centerID
+                    );
                 }
-                if (substr($tmRow['STORAGE_ADDRESS'],0,7) != 'VIRTUAL'){
+                if (substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') {
                     insertSample($tmRow, $candidate, $centerID, $session['ID']);
                 }
             }
-        unset($tmRow);
+            unset($tmRow);
         }
     }
     fclose($handle);
@@ -200,6 +205,7 @@ function showHelp()
  * @param int   $userID   the userID of the person running the script
  * @param int   $centerID the ID of the center where the sample where collected
  *
+ * @return void
  */
 function insertSession($tmRow, $candID, $userID, $centerID)
 {
@@ -265,13 +271,22 @@ function insertSample(array $tmRow, int $candID, $centerID, $sessionID)
     $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
 
     // insert containers
-    $tmLocation  = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
+    $tmLocation  = explodeLocation(
+        $tmRow['STORAGE_ADDRESS'],
+        $tmRow['SAMPLE_NUMBER']
+    );
     $containerID = insertContainerStack($tmLocation, $sample);
     // insert the aliquot
-    $index = sizeof($tmLocation)-1;
+    $index       = sizeof($tmLocation)-1;
     $containerID = insertContainer($tmLocation[$index], $sample, $containerID, true);
     // insert specimen
-    $specimenID = insertSpecimen($tmRow, $containerID, $candID, $sessionID, $centerID);
+    $specimenID = insertSpecimen(
+        $tmRow,
+        $containerID,
+        $candID,
+        $sessionID,
+        $centerID
+    );
 }
 
 /**
@@ -364,7 +379,8 @@ function explodeLocation(string $storageAdress, string $barcode) : array
  * - quantity
  * - freeze thaw cycle
  *
- * @param array $tmRow row of data for Oracle DB
+ * @param array $tmRow    row of data for Oracle DB
+ * @param int   $centerID the ID of the center
  *
  * @return bool succes of the insertion
  */
@@ -411,14 +427,17 @@ function updateSample(array $tmRow, $centerID)
                 FROM biobank_container_status
                 WHERE Label = "Available"';
             $containerStatusID = $DB->pselectOne($sql, array());
-    
+
             $sample = array();
             $sample['ContainerStatusID'] = $containerStatusID;
             $sample['OriginCenterID']    = $centerID;
             $sample['CurrentCenterID']   = $centerID;
             $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
 
-            $tmLocation           = explodeLocation($tmRow['STORAGE_ADDRESS'], $tmRow['SAMPLE_NUMBER']);
+            $tmLocation           = explodeLocation(
+                $tmRow['STORAGE_ADDRESS'],
+                $tmRow['SAMPLE_NUMBER']
+            );
             $newParentContainerID = insertContainerStack($tmLocation, $sample);
         } else {
             //check if location is empty
@@ -451,11 +470,13 @@ function updateSample(array $tmRow, $centerID)
     }
 
     // check FreezeThawCycle and update if needed
-    if ($tmRow['FT_CYCLES'] != 0 && ( $current['FreezeThawCycle'] != $tmRow['FT_CYCLES'])) {
+    if ($tmRow['FT_CYCLES'] != 0
+        && ( $current['FreezeThawCycle'] != $tmRow['FT_CYCLES'])
+    ) {
         $DB->replace(
             'biobank_specimen_freezethaw',
             array(
-             'SpecimenID' => $current['SpecimenID'],
+             'SpecimenID'      => $current['SpecimenID'],
              'FreezeThawCycle' => $tmRow['FT_CYCLES'],
             )
         );
@@ -480,7 +501,12 @@ function insertContainerStack(array $tmLocation, $sample) : int
     // shelf, rack and box
     $size = count($tmLocation);
     for ($i = 1; $i < $size - 1; $i++) {
-        $containerID = insertContainer($tmLocation[$i], $sample, $containerID, false);
+        $containerID = insertContainer(
+            $tmLocation[$i],
+            $sample,
+            $containerID,
+            false
+        );
     }
     return $containerID;
 }
@@ -496,8 +522,12 @@ function insertContainerStack(array $tmLocation, $sample) : int
  *
  * @return int the ContainerID
  */
-function insertContainer(array $container, $sample, $parent = null, $exclusive = true) : int
-{
+function insertContainer(
+    array $container,
+    $sample,
+    $parent = null,
+    $exclusive = true
+) : int {
     $DB =& \Database::singleton();
 
     //check if already exist
@@ -557,8 +587,13 @@ function insertContainer(array $container, $sample, $parent = null, $exclusive =
  *
  * @return int the specimenID
  */
-function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $centerID) : int
-{
+function insertSpecimen(
+    array $tmRow,
+    int $containerID,
+    $candID,
+    $sessionID,
+    $centerID
+) : int {
     $DB =& \Database::singleton();
 
     $specimen = array();
@@ -609,7 +644,7 @@ function insertSpecimen(array $tmRow, int $containerID, $candID, $sessionID, $ce
     }
 
     $specimenPrep['CenterID'] = $centerID;
-    $specimenPrep['Date']     = $tmRow['PREP_DATE'];  
+    $specimenPrep['Date']     = $tmRow['PREP_DATE'];
     $specimenPrep['Time']     = '00:00:00';
     $specimenPrep['Data']     = getJson($tmRow, 'preparation');
 
@@ -668,7 +703,7 @@ function getJson(array $tmRow, string $category) : string
     $json = array();
     foreach ($jsonAttributes[$category] as $key => $label) {
         if (isset($tmRow[$key]) && !empty(trim($tmRow[$key]))) {
-            $id        = $jsonIDs[$label];
+            $id = $jsonIDs[$label];
             if (!empty($id)) {
                 $json[$id] = trim($tmRow[$key]);
             }
