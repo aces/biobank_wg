@@ -646,9 +646,15 @@ function insertSpecimen(
     $specimenPrep['CenterID'] = $centerID;
     $specimenPrep['Date']     = $tmRow['PREP_DATE'];
     $specimenPrep['Time']     = '00:00:00';
-    $specimenPrep['Data']     = getJson($tmRow, 'preparation');
-
+    $specimenPrepJson['Data'] = getJson($tmRow, 'preparation');
     $DB->insert('biobank_specimen_preparation', $specimenPrep);
+    if ($specimenPrepJson['Data'] != '[]') {
+        $DB->unsafeUpdate(
+            'biobank_specimen_preparation',
+            $specimenPrepJson,
+            array('SpecimenID' => $specimenID)
+        );
+    }
 
     // insert specimen_collection
     $specimenColl = array();
@@ -656,12 +662,17 @@ function insertSpecimen(
     $specimenColl['Quantity']   = $tmRow['QTY_ON_HAND'];
     $specimenColl['UnitID']     = getUnitID($tmRow['QTY_UNITS']);
     $specimenColl['CenterID']   = $centerID;
-
-    $specimenColl['Date'] = $tmRow['COLLECTION_DATE'];
-    $specimenColl['Time'] = '00:00:00';
-    $specimenColl['Data'] = getJson($tmRow, 'collection');
-
+    $specimenColl['Date']       = $tmRow['COLLECTION_DATE'];
+    $specimenColl['Time']       = '00:00:00';
+    $specimenCollJson['Data']   = getJson($tmRow, 'collection');
     $DB->insert('biobank_specimen_collection', $specimenColl);
+    if ($specimenCollJson['Data'] != '[]') {
+        $DB->unsafeUpdate(
+            'biobank_specimen_collection',
+            $specimenCollJson,
+            array('SpecimenID' => $specimenID)
+        );
+    }
 
     return $specimenID;
 }
