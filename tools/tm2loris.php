@@ -598,7 +598,7 @@ function insertSpecimen(
 
     $specimen = array();
     $specimen['ContainerID'] = $containerID;
-    $specimen['CandidateID'] = $candID;
+//    $specimen['CandidateID'] = $candID;    removed from table schema
     $specimen['SessionID']   = $sessionID;
 
     $sql = 'SELECT SpecimenTypeID
