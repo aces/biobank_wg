@@ -22,6 +22,7 @@
 //TODO list:
 // adjust reading csv (excel?) file as needed
 // fix json_encode
+// Add examinerID in biobank_specimen_XYZ  (Need to create users for CRU members)
 
 
 require_once __DIR__ ."/cred.inc";  //Oracle DB credential
@@ -75,12 +76,18 @@ if (!$centerID) {
     $centerID = insertCenter($defaultCenterName);
 }
 
+$newCandID = $DB->pselectOne(
+            "SELECT max(CandID) + 1
+             FROM candidate",
+            array()
+        );
+$newCandID = is_null($newCandID) ? 100000 : $newCandID;
 
 //get the list of ID for json attributes in LORIS DB
 $jsonIDs = getJsonID($jsonAttributes);
 
 // get the list of candidate to process and process
-// csv format = TMID, LORISID
+// csv format = TM_donors.donor_number, LORISID (PSCID)
 if (($handle = fopen("testcandidate.csv", "r")) !== false) {
     $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
         to_char(PREP_DATE, 'YYYY-MM-DD') as PREP_DATE,
@@ -95,7 +102,7 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
     LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
     LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
-    WHERE s.DONOR_ID = :tmID";
+    WHERE D.DONOR_number = :tmID";
     $stid    = oci_parse($orConn, $orQuery);
 
     while (($data = fgetcsv($handle)) !== false) {
@@ -103,21 +110,28 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
         $candidate = $DB->pselectOne(
             "SELECT CandID
              FROM candidate
-             WHERE CandID = :candID AND CenterID = :centerID",
+             WHERE PSCID = :pscID AND RegistrationCenterID = :centerID",
             array(
-             'candID'   => $data[1],
+             'pscID'   => $data[1],
              'centerID' => $centerID,
             )
         );
 
 
-        if (!$candidate) {
-            throw new LorisException('Candidate not define in LORIS'); //TODO to refine
-        }
+//        if (!$candidate) {
+//            throw new LorisException('Candidate not define in LORIS'); //TODO to refine
+//        }
 
+$NBCand=0;
         oci_bind_by_name($stid, ":tmID", $data[0]);
         oci_execute($stid);
-        while (($tmRow = oci_fetch_assoc($stid)) != false) {
+        while (($tmRow = oci_fetch_assoc($stid)) != false && ($NBCand++ < 26)) {
+
+
+        if (empty($candidate['CandID']) && empty($candidate)) {
+            $candidate = insertCandidate($tmRow, $data[1], $newCandID++, $centerID, $userID);
+        }
+
             // check if sample already exist in Loris
             $sampleExist = $DB->pselectOne(
                 "SELECT COUNT(ContainerID)
@@ -147,7 +161,8 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
                         $centerID
                     );
                 }
-                if (substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') {
+                if ((substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') && 
+                    (substr($tmRow['STORAGE_ADDRESS'], 0, 5) != 'FRZ00')) {
                     insertSample($tmRow, $candidate, $centerID, $session['ID']);
                 }
             }
@@ -155,6 +170,38 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
         }
     }
     fclose($handle);
+}
+
+/**
+ * Insert a candidate into LORIS
+ * @param array $tmRow     row of data for Oracle DB
+ * @param array $candidate row of data for Oracle DB
+ *
+ * @return void
+ */
+function insertCandidate(array $tmRow, string $pscid, int $newCandID, int $centerID, string $userID) : int
+{
+    $DB =& \Database::singleton();
+
+    $candidate['CandID']       = $newCandID;
+    $candidate['PSCID']       = $pscid;
+    $candidate['active']      = 'Y';
+    $candidate['RegistrationCenterID']    = $centerID;
+    $candidate['UserID']      = $userID; // from TM
+    $candidate['Testdate']    = $tmRow['EVENT_DATE']; // from TM
+    $candidate['Entity_type'] = 'Human';
+
+   $DB->insert("candidate", $candidate);
+   $ID = $DB->getLastInsertID();
+
+   return $DB->pselectOne(
+            "SELECT CandID
+             FROM candidate
+             WHERE ID = :ID",
+            array(
+             'ID'   => $ID,
+            )
+        );
 }
 
 /**
@@ -399,7 +446,18 @@ function updateSample(array $tmRow, $centerID)
     $current = $DB->pselectRow($sql, array('barcode' => $tmRow['SAMPLE_NUMBER']));
 
     // check quantity and update if needed
+//var_dump($tmRow);
     if ($current['Quantity'] != $tmRow['QTY_ON_HAND']) {
+        //exception for null unit
+        if (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_TYPE'] == 'DNA') {
+            $tmRow['QTY_UNITS'] = "µL";
+            echo "Qty_Units null, DNA, assuming µL\n";
+        }
+        elseif (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_TYPE'] == 'Trizol lysate') {
+            $tmRow['QTY_UNITS'] = "10⁶/mL";
+            echo "Qty_Units null, Trizol lysate, assuming 10⁶/mL\n";
+        }
+
         $DB->update(
             'biobank_specimen',
             array(
@@ -496,6 +554,7 @@ function updateSample(array $tmRow, $centerID)
  */
 function insertContainerStack(array $tmLocation, $sample) : int
 {
+
     // top level container
     $containerID = insertContainer($tmLocation[0], $sample, null, false);
     // shelf, rack and box
@@ -545,17 +604,18 @@ function insertContainer(
     //not existant, add
     $sql = 'SELECT ContainerTypeID
             FROM biobank_container_type
-            WHERE Type = :type and Descriptor = :Descriptor';
+            WHERE Type = :Type AND Descriptor = :Descriptor';
     $containerTypeID = $DB->pselectOne(
         $sql,
         array(
-         'type'       => $container['type'],
+         'Type' => $container['type'],
          'Descriptor' => $container['descriptor'],
         )
     );
-
+//print ("container type id: $containerTypeID\n");
     $sample['Barcode']         = $container['barcode'];
     $sample['ContainerTypeID'] = $containerTypeID;
+//var_dump($sample);
     $DB->insert('biobank_container', $sample);
     $containerID = $DB->getLastInsertId();
 
@@ -611,6 +671,17 @@ function insertSpecimen(
     if ($specimen['SpecimenTypeID'] === null) {
         throw new LorisException('invalid specimen type'); //TODO to refine
     }
+
+    //exception for null unit
+    if (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_TYPE'] == 'DNA') {
+        $tmRow['QTY_UNITS'] = "µL";
+        echo "Qty_Units null, DNA, assuming µL\n";
+    }
+    elseif (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_TYPE'] == 'Trizol lysate') {
+        $tmRow['QTY_UNITS'] = "10⁶/mL";
+        echo "Qty_Units null, Trizol lysate, assuming 10⁶/mL\n";
+    }
+//var_dump($tmRow);
     $specimen['Quantity'] = $tmRow['QTY_ON_HAND'];
     $specimen['UnitID']   = getUnitID($tmRow['QTY_UNITS']);
 
@@ -640,14 +711,19 @@ function insertSpecimen(
         array('label' => $tmRow['SAMPLE_CATEGORY'])
     );
     if (empty($specimenPrep['SpecimenProtocolID'])) {
-        throw new LorisException('specimen_protocol inexistant'); // TODO to refine
+        throw new LorisException("specimen_protocol inexistant: {$tmRow['SAMPLE_CATEGORY']}"); // TODO to refine
+    }
+
+    if (is_null($tmRow['PREP_DATE'])) {
+        echo "Prep_Date null, assuming Event_Date\n";
+        $tmRow['PREP_DATE'] = $tmRow['EVENT_DATE'];
     }
 
     $specimenPrep['CenterID'] = $centerID;
     $specimenPrep['Date']     = $tmRow['PREP_DATE'];
     $specimenPrep['Time']     = '00:00:00';
-    $specimenPrepJson['Data'] = getJson($tmRow, 'preparation');
     $DB->insert('biobank_specimen_preparation', $specimenPrep);
+    $specimenPrepJson['Data'] = getJson($tmRow, 'preparation');
     if ($specimenPrepJson['Data'] != '[]') {
         $DB->unsafeUpdate(
             'biobank_specimen_preparation',
@@ -657,15 +733,24 @@ function insertSpecimen(
     }
 
     // insert specimen_collection
+
+    // exception
+    if (is_null($tmRow['COLLECTION_DATE'])) {
+        echo "Coll_Date null, assuming Event_Date\n";
+        $tmRow['COLLECTION_DATE'] = $tmRow['EVENT_DATE'];
+    }
+
     $specimenColl = array();
     $specimenColl['SpecimenID'] = $specimenID;
+    $specimenColl['SpecimenProtocolID'] = $specimenPrep['SpecimenProtocolID'];  //should be different
     $specimenColl['Quantity']   = $tmRow['QTY_ON_HAND'];
     $specimenColl['UnitID']     = getUnitID($tmRow['QTY_UNITS']);
     $specimenColl['CenterID']   = $centerID;
     $specimenColl['Date']       = $tmRow['COLLECTION_DATE'];
     $specimenColl['Time']       = '00:00:00';
-    $specimenCollJson['Data']   = getJson($tmRow, 'collection');
     $DB->insert('biobank_specimen_collection', $specimenColl);
+
+    $specimenCollJson['Data']   = getJson($tmRow, 'collection');
     if ($specimenCollJson['Data'] != '[]') {
         $DB->unsafeUpdate(
             'biobank_specimen_collection',
@@ -673,7 +758,6 @@ function insertSpecimen(
             array('SpecimenID' => $specimenID)
         );
     }
-
     return $specimenID;
 }
 
