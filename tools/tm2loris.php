@@ -21,8 +21,14 @@
 
 //TODO list:
 // adjust reading csv (excel?) file as needed
-// fix json_encode
+// 
 // Add examinerID in biobank_specimen_XYZ  (Need to create users for CRU members)
+// add container_project_rel value
+// auto add new protocol as needed
+// 
+// possible search with first 6 number of barcode (TM_DONOR_NUMBER) (in web interface)
+// 
+// add date collected or processed in specimen windows
 
 
 require_once __DIR__ ."/cred.inc";  //Oracle DB credential
@@ -67,7 +73,7 @@ if (!oci_execute($stid)) {
 }
 
 //insert default centerID
-$centerID = $DB->pselectOne(    //TODO check if centerID or PSCID
+$centerID = $DB->pselectOne(
     "SELECT CenterID FROM psc
      WHERE Name = :centerName",
     array('centerName' => $defaultCenterName['Name'])
@@ -325,7 +331,7 @@ function insertSample(array $tmRow, int $candID, $centerID, $sessionID)
     $containerID = insertContainerStack($tmLocation, $sample);
     // insert the aliquot
     $index       = sizeof($tmLocation)-1;
-    $containerID = insertContainer($tmLocation[$index], $sample, $containerID, true);
+    $containerID = insertContainer($tmLocation[$index], $sample, $containerID, true, $tmRow['STORAGE_STATUS']);
     // insert specimen
     $specimenID = insertSpecimen(
         $tmRow,
@@ -366,25 +372,34 @@ function explodeLocation(string $storageAdress, string $barcode) : array
             $tmLocation[0]['type']     = 'Freezer';
             $tmLocation[0]['barcode']  = $locationSplit[0];
             $tmLocation[0]['location'] = substr($locationSplit[0], 3);
+            $tmLocation[0]['Temperature'] = -80;
 
             $tmLocation[1]['type']     = 'Shelf';
             $tmLocation[1]['barcode']  = $tmLocation[0]['barcode'].'-'.
-                substr($locationSplit[1], 1);
+                $locationSplit[1];
             $tmLocation[1]['location'] = substr($locationSplit[1], 1);
+            $tmLocation[1]['Temperature'] = -80;
+
 
             $tmLocation[2]['type']     = 'Rack';
             $tmLocation[2]['barcode']  = $tmLocation[1]['barcode'].'-'.
-                substr($locationSplit[2], 1);
+                $locationSplit[2];
             $tmLocation[2]['location'] = substr($locationSplit[2], 1);
+            $tmLocation[2]['Temperature'] = -80;
+
 
             $tmLocation[3]['type']     = 'Matrix Box';
             $tmLocation[3]['barcode']  = $tmLocation[2]['barcode'].'-'.
-                substr($locationSplit[3], 1);
+                $locationSplit[3];
             $tmLocation[3]['location'] = substr($locationSplit[3], 1);
+            $tmLocation[3]['Temperature'] = -80;
+
 
             $tmLocation[4]['type']     = 'Tube';
             $tmLocation[4]['barcode']  = $barcode;
             $tmLocation[4]['location'] = $locationSplit[4];
+            $tmLocation[4]['Temperature'] = -80;
+
             break;
 
         case 'CRY':
@@ -392,23 +407,33 @@ function explodeLocation(string $storageAdress, string $barcode) : array
             $tmLocation[0]['type']       = 'CryoTank';
             $tmLocation[0]['barcode']    = 'CRYO-'.$locationSplit[1];
             $tmLocation[0]['location']   = $locationSplit[1];
+            $tmLocation[0]['Temperature'] = -196;
+
 
             $tmLocation[1]['descriptor'] = '13 box';
             $tmLocation[1]['type']       = 'Rack';
             $tmLocation[1]['barcode']    = $tmLocation[0]['barcode'].'-'.
-                substr($locationSplit[2], 1);
+                $locationSplit[2];
             $tmLocation[1]['location']   = substr($locationSplit[2], 1);
+            $tmLocation[1]['Temperature'] = -196;
+
 
             $tmLocation[2]['descriptor'] = '10x10';
             $tmLocation[2]['type']       = 'Matrix Box';
             $tmLocation[2]['barcode']    = $tmLocation[1]['barcode'].'-'.
-                substr($locationSplit[3], 1);
+                $locationSplit[3];
             $tmLocation[2]['location']   = substr($locationSplit[3], 1);
+            $tmLocation[2]['Temperature'] = -196;
+
 
             $tmLocation[3]['descriptor'] = 'Cryotube';
             $tmLocation[3]['type']       = 'Tube';
             $tmLocation[3]['barcode']    = $barcode;
             $tmLocation[3]['location']   = $locationSplit[4];
+            $tmLocation[3]['Temperature'] = -196;
+
+
+
             break;
 
         case 'VIR':
@@ -457,7 +482,7 @@ function updateSample(array $tmRow, $centerID)
             $tmRow['QTY_UNITS'] = "10⁶/mL";
             echo "Qty_Units null, Trizol lysate, assuming 10⁶/mL\n";
         }
-
+        // TODO storage_status
         $DB->update(
             'biobank_specimen',
             array(
@@ -559,12 +584,14 @@ function insertContainerStack(array $tmLocation, $sample) : int
     $containerID = insertContainer($tmLocation[0], $sample, null, false);
     // shelf, rack and box
     $size = count($tmLocation);
+    $statusID = getContainerStatus('Available');
     for ($i = 1; $i < $size - 1; $i++) {
         $containerID = insertContainer(
             $tmLocation[$i],
             $sample,
             $containerID,
-            false
+            false,
+            $statusID
         );
     }
     return $containerID;
@@ -585,7 +612,8 @@ function insertContainer(
     array $container,
     $sample,
     $parent = null,
-    $exclusive = true
+    $exclusive = true,
+    $statusID = null
 ) : int {
     $DB =& \Database::singleton();
 
@@ -612,9 +640,11 @@ function insertContainer(
          'Descriptor' => $container['descriptor'],
         )
     );
+    
 //print ("container type id: $containerTypeID\n");
-    $sample['Barcode']         = $container['barcode'];
-    $sample['ContainerTypeID'] = $containerTypeID;
+    $sample['Barcode']           = $container['barcode'];
+    $sample['ContainerTypeID']   = $containerTypeID;
+    $sample['Temperature']       = $container['Temperature'];
 //var_dump($sample);
     $DB->insert('biobank_container', $sample);
     $containerID = $DB->getLastInsertId();
@@ -681,7 +711,8 @@ function insertSpecimen(
         $tmRow['QTY_UNITS'] = "10⁶/mL";
         echo "Qty_Units null, Trizol lysate, assuming 10⁶/mL\n";
     }
-//var_dump($tmRow);
+
+    // TODO storage_status
     $specimen['Quantity'] = $tmRow['QTY_ON_HAND'];
     $specimen['UnitID']   = getUnitID($tmRow['QTY_UNITS']);
 
@@ -870,4 +901,27 @@ function insertCenter(array $centerName) : int
 
     $DB->insert('psc', $centerName);
     return $DB->getLastInsertId();
+}
+
+/**
+ * Get the containerStatusID from biobank_container_status
+ *
+ * @param string the status from TM
+ *
+ * @return int the containerStatusID
+ */
+
+function getContainerStatus($statusID) : int
+{
+    $DB =& \Database::singleton();
+    $sql = 'SELECT ContainerStatusID
+           FROM biobank_container_status
+           WHERE Label = :label';
+    $containerStatusID = $DB->pselectOne(
+        $sql,
+        array(
+         'label' => $statusID,
+         )
+    );
+    return $containerStatusID;
 }
