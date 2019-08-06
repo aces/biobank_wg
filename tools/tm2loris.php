@@ -24,7 +24,7 @@
 // 
 // Add examinerID in biobank_specimen_XYZ  (Need to create users for CRU members)
 // 
-// auto add new protocol as needed
+// Box size (2) for cryotank 
 // 
 // add date collected or processed in specimen windows
 
@@ -109,7 +109,6 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
     WHERE D.DONOR_number = :tmID";
     $stid    = oci_parse($orConn, $orQuery);
-
     while (($data = fgetcsv($handle)) !== false) {
         // check if candidate exist
         $candidate = $DB->pselectOne(
@@ -122,15 +121,15 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
             )
         );
 
-
 //        if (!$candidate) {
 //            throw new LorisException('Candidate not define in LORIS'); //TODO to refine
 //        }
 
 $NBCand=0;
+
         oci_bind_by_name($stid, ":tmID", $data[0]);
         oci_execute($stid);
-        while (($tmRow = oci_fetch_assoc($stid)) != false && ($NBCand++ < 26)) {
+        while (($tmRow = oci_fetch_assoc($stid)) != false ) {
 
 
         if (empty($candidate['CandID']) && empty($candidate)) {
@@ -138,7 +137,6 @@ $NBCand=0;
         }
 
         adjustAttribute($tmRow);
-
             // check if sample already exist in Loris
             $sampleExist = $DB->pselectOne(
                 "SELECT COUNT(ContainerID)
@@ -737,7 +735,7 @@ function insertSpecimen(
     // insert preparation
     $specimenPrep = array();
     $specimenPrep['SpecimenID'] = $specimenID;
-    $specimenPrep['SpecimenProtocolID'] = getProtocolID("Analysis", $tmRow['SAMPLE_CATEGORY']);
+    $specimenPrep['SpecimenProtocolID'] = getProtocolID("Preparation", $tmRow['SAMPLE_CATEGORY']);
 
 
     if (is_null($tmRow['PREP_DATE'])) {
@@ -770,7 +768,7 @@ function insertSpecimen(
 
     $specimenColl = array();
     $specimenColl['SpecimenID'] = $specimenID;
-    $specimenPrep['SpecimenProtocolID'] = getProtocolID("Collection", $tmRow['SAMPLE_CATEGORY']);
+    $specimenColl['SpecimenProtocolID'] = getProtocolID("Collection", $tmRow['SAMPLE_CATEGORY']);
     $specimenColl['Quantity']   = $tmRow['QTY_ON_HAND'];
     $specimenColl['UnitID']     = getUnitID($tmRow['QTY_UNITS']);
     $specimenColl['CenterID']   = $centerID;
@@ -989,6 +987,7 @@ function insertContainerProjectRel($containerID, $projectID) : void
 
 function getProtocolID($process, $label)
 {
+    $DB   =& \Database::singleton();
     $sql = 'SELECT SpecimenProtocolID
         FROM biobank_specimen_protocol
         WHERE Label like :label and SpecimenProcessID = :process';
@@ -999,7 +998,7 @@ function getProtocolID($process, $label)
 		 'process' => getProcessID($process)
          )
     );
-    if (!$ProtocolID) {
+    if (!$protocolID) {
         throw new LorisException("specimen_protocol inexistant: $process, $label"); 
     }
 
@@ -1008,13 +1007,14 @@ function getProtocolID($process, $label)
 
 function getProcessID($process)
 {
+    $DB   =& \Database::singleton();
     $sql = 'SELECT SpecimenProcessID
         FROM biobank_specimen_process
         WHERE Label like :label';
-    return  = $DB->pselectOne(
+    return $DB->pselectOne(
         $sql,
         array(
-         'label'   => $process
+         'label' => $process
          )
     );
 }
