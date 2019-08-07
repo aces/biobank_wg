@@ -24,7 +24,7 @@
 // 
 // Add examinerID in biobank_specimen_XYZ  (Need to create users for CRU members)
 // 
-// Box size (2) for cryotank 
+// Box size (2) for cryotank (CRYO-08S) for 5x5, others are 10x10
 // 
 // add date collected or processed in specimen windows
 
@@ -737,7 +737,6 @@ function insertSpecimen(
     $specimenPrep['SpecimenID'] = $specimenID;
     $specimenPrep['SpecimenProtocolID'] = getProtocolID("Preparation", $tmRow['SAMPLE_CATEGORY']);
 
-
     if (is_null($tmRow['PREP_DATE'])) {
         echo "Prep_Date null, assuming Event_Date\n";
         $tmRow['PREP_DATE'] = $tmRow['EVENT_DATE'];
@@ -746,7 +745,7 @@ function insertSpecimen(
     $specimenPrep['CenterID'] = $centerID;
     $specimenPrep['Date']     = $tmRow['PREP_DATE'];
     $specimenPrep['Time']     = '00:00:00';
-    $specimenPrep['ExaminerID'] = 4;   // TODO user data from TM
+    $specimenPrep['ExaminerID'] = extractExaminer($tmRow['PREP_BY'], 2);
 
     $DB->insert('biobank_specimen_preparation', $specimenPrep);
     $specimenPrepJson['Data'] = getJson($tmRow, 'preparation');
@@ -774,7 +773,7 @@ function insertSpecimen(
     $specimenColl['CenterID']   = $centerID;
     $specimenColl['Date']       = $tmRow['COLLECTION_DATE'];
     $specimenColl['Time']       = '00:00:00';
-	$specimenColl['ExaminerID'] = 4;  // TODO  use examiner from TM
+	$specimenColl['ExaminerID'] = extractExaminer($tmRow['PREP_BY'], 1);
     $DB->insert('biobank_specimen_collection', $specimenColl);
 
     $specimenCollJson['Data']   = getJson($tmRow, 'collection');
@@ -1019,3 +1018,45 @@ function getProcessID($process)
     );
 }
 
+function extractExaminer($name, $step)
+{
+    // TM initial, LORIS UserID
+    $refTable = array('MNB' => 'Marie-Noëlle Boivin',
+                      'SL'  => 'Sonia Lai',
+                      'MT'  => 'Mahdieh Tabatabaei Shafiei',
+                      'JS'  => 'Julien Sirois',
+                      'AV'  => 'Ada Villalobos'
+                     );
+
+    $tmUsersList = explode(',', $name);
+
+    if ($step == 1) {
+        $tmUser = $tmUsersList[0];
+    } elseif ($step == 2 && !empty($tmUsersList[1])) {
+        $tmUser = $tmUsersList[1];
+    } else {
+        $tmUser = $tmUsersList[0];
+    }
+
+    if (array_key_exists($tmUser, $refTable)) {
+        $examinerName = $refTable[$tmUser];
+    } else {
+        $examinerName = 'Admin account';
+    }
+
+    return getExaminerID($examinerName);
+}
+
+    function getExaminerID($examinerName)
+{
+    $DB   =& \Database::singleton();
+    $sql = 'SELECT examinerID
+        FROM examiners
+        WHERE full_name = :name';
+    return $DB->pselectOne(
+        $sql,
+        array(
+         'name' => $examinerName
+         )
+    );
+}
