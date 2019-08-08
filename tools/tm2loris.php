@@ -107,8 +107,10 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
     LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
     LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
-    WHERE D.DONOR_number = :tmID";
+    WHERE D.DONOR_number = :tmID
+    AND SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')";
     $stid    = oci_parse($orConn, $orQuery);
+
     while (($data = fgetcsv($handle)) !== false) {
         // check if candidate exist
         $candidate = $DB->pselectOne(
@@ -311,15 +313,8 @@ function insertSession($tmRow, $candID, $userID, $centerID)
  */
 function insertSample(array $tmRow, int $candID, $centerID, $sessionID, $projectID)
 {
-    $DB =& \Database::singleton();
-
-    $sql = 'SELECT ContainerStatusID
-            FROM biobank_container_status
-            WHERE Label = "Available"';
-    $containerStatusID = $DB->pselectOne($sql, array());
-
     $sample = array();
-    $sample['ContainerStatusID'] = $containerStatusID;
+    $sample['ContainerStatusID'] = getContainerStatus('Available');
     $sample['OriginCenterID']    = $centerID;
     $sample['CurrentCenterID']   = $centerID;
     $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
@@ -333,6 +328,7 @@ function insertSample(array $tmRow, int $candID, $centerID, $sessionID, $project
     // insert the aliquot
     $index       = sizeof($tmLocation)-1;
     $containerID = insertContainer($tmLocation[$index], $sample, $containerID, true, $tmRow['STORAGE_STATUS'], $projectID);
+
     // insert specimen
     $specimenID = insertSpecimen(
         $tmRow,
@@ -506,13 +502,8 @@ function updateSample(array $tmRow, $centerID)
             array('newParent' => $newParent)
         );
         if (empty($newParentContainerID)) {
-            $sql = 'SELECT ContainerStatusID
-                FROM biobank_container_status
-                WHERE Label = "Available"';
-            $containerStatusID = $DB->pselectOne($sql, array());
-
-            $sample = array();
-            $sample['ContainerStatusID'] = $containerStatusID;
+           $sample = array();
+            $sample['ContainerStatusID'] = getContainerStatus("Available");
             $sample['OriginCenterID']    = $centerID;
             $sample['CurrentCenterID']   = $centerID;
             $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
@@ -694,16 +685,7 @@ function insertSpecimen(
 //    $specimen['CandidateID'] = $candID;    removed from table schema
     $specimen['SessionID']   = $sessionID;
 
-    $sql = 'SELECT SpecimenTypeID
-         FROM biobank_specimen_type
-         WHERE Label = :label';
-    $specimen['SpecimenTypeID'] = $DB->pselectOne(
-        $sql,
-        array('label' => $tmRow['SAMPLE_TYPE'])
-    );
-    if ($specimen['SpecimenTypeID'] === null) {
-        throw new LorisException("invalid specimen type {$tmRow['SAMPLE_TYPE']}"); //TODO to refine
-    }
+    $specimen['SpecimenTypeID'] = getSpecimentTypeID($tmRow['SAMPLE_TYPE']);
 
     //exception for null unit
     if (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_TYPE'] == 'DNA') {
@@ -908,7 +890,7 @@ function insertCenter(array $centerName) : int
 
 function getContainerStatus($statusID) : int
 {
-    $DB =& \Database::singleton();
+    $DB  =& \Database::singleton();
     $sql = 'SELECT ContainerStatusID
            FROM biobank_container_status
            WHERE Label = :label';
@@ -967,14 +949,14 @@ function adjustAttribute(&$tmRow) : void
 
 function getProjectID($project) : string
 {
-    $DB   =& \Database::singleton();
-    $sql  = "SELECT ProjectID FROM Project WHERE Name = :name";
+    $DB  =& \Database::singleton();
+    $sql = "SELECT ProjectID FROM Project WHERE Name = :name";
     return $DB->pselectOne($sql, array('name' => $project));
 }
 
 function insertContainerProjectRel($containerID, $projectID) : void
 {
-    $DB   =& \Database::singleton();
+    $DB =& \Database::singleton();
     $DB->insert(
         'biobank_container_project_rel',
         array(
@@ -986,7 +968,7 @@ function insertContainerProjectRel($containerID, $projectID) : void
 
 function getProtocolID($process, $label)
 {
-    $DB   =& \Database::singleton();
+    $DB  =& \Database::singleton();
     $sql = 'SELECT SpecimenProtocolID
         FROM biobank_specimen_protocol
         WHERE Label like :label and SpecimenProcessID = :process';
@@ -997,16 +979,16 @@ function getProtocolID($process, $label)
 		 'process' => getProcessID($process)
          )
     );
-    if (!$protocolID) {
-        throw new LorisException("specimen_protocol inexistant: $process, $label"); 
-    }
+//    if (!$protocolID) {
+//        throw new LorisException("specimen_protocol inexistant: $process, $label"); 
+//    }
 
     return $protocolID;
 }
 
 function getProcessID($process)
 {
-    $DB   =& \Database::singleton();
+    $DB  =& \Database::singleton();
     $sql = 'SELECT SpecimenProcessID
         FROM biobank_specimen_process
         WHERE Label like :label';
@@ -1049,7 +1031,7 @@ function extractExaminer($name, $step)
 
     function getExaminerID($examinerName)
 {
-    $DB   =& \Database::singleton();
+    $DB  =& \Database::singleton();
     $sql = 'SELECT examinerID
         FROM examiners
         WHERE full_name = :name';
@@ -1059,4 +1041,20 @@ function extractExaminer($name, $step)
          'name' => $examinerName
          )
     );
+}
+
+function getSpecimentTypeID($sampleType)
+{
+    $DB  =& \Database::singleton();
+    $sql = 'SELECT SpecimenTypeID
+         FROM biobank_specimen_type
+         WHERE Label = :label';
+    $specimenTypeID = $DB->pselectOne(
+        $sql,
+        array('label' => $sampleType)
+    );
+    if ($specimenTypeID === null) {
+        throw new LorisException("invalid specimen type $sampleType"); //TODO to refine
+    }
+    return $specimenTypeID;
 }
