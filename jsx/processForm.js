@@ -220,12 +220,14 @@ class SpecimenProcessForm extends Component {
                 }
               };
               if (options.specimen.protocolAttributes[process.protocolId]) {
-                return (
-                  <StaticElement
-                    label={options.specimen.protocolAttributes[process.protocolId][key].label}
-                    text={renderValue()}
-                  />
-                );
+                if (options.specimen.protocolAttributes[process.protocolId][key]) {
+                  return (
+                    <StaticElement
+                      label={options.specimen.protocolAttributes[process.protocolId][key].label}
+                      text={renderValue()}
+                    />
+                  );
+                }
               }
             });
           }

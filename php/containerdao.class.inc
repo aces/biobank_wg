@@ -133,7 +133,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                      bct.ContainerCapacityID,
                      bct.ContainerDimensionID,
                      bc.ContainerStatusID,
-                     GROUP_CONCAT(bcpr.ProjectID) as ProjectIDs,
+                     GROUP_CONCAT(DISTINCT(bcpr.ProjectID)) as ProjectIDs,
                      bc.Temperature,
                      bc.OriginCenterID,
                      bc.CurrentCenterID,

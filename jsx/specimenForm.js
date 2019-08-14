@@ -188,11 +188,28 @@ class BiobankSpecimenForm extends React.Component {
       }
     };
 
+    const generateBarcodes = () => {
+      const list = Object.keys(current.list)
+        .reduce((result, key) => {
+          current.list[key].container.barcode = key;
+          result[key] = current.list[key];
+          return result;
+      }, {});
+      console.log(list);
+      setCurrent('list', list);
+    };
+
     return (
       <div>
         <div className='row'>
           <div className="col-xs-11">
             {renderNote()}
+            <ButtonElement
+              name='generate'
+              label='Generate Barcodes'
+              type='button'
+              onUserInput={generateBarcodes}
+            />
             {renderGlobalFields()}
             <SelectElement
               name='projectIds'
@@ -302,7 +319,7 @@ class SpecimenBarcodeForm extends React.Component {
     const renderRemoveSpecimenButton = () => {
       if (removeSpecimen) {
         const glyphStyle = {
-          color: '#DDDDDD',
+          color: '#808080',
           marginLeft: 10,
           cursor: 'pointer',
           fontSize: 15,

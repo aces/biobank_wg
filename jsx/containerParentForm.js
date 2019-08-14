@@ -93,7 +93,7 @@ class ContainerParentForm extends Component {
     };
 
     return (
-      <FormElement>
+      <div>
         <SelectElement
           name="parentContainerId"
           label="Parent Container Barcode"
@@ -102,7 +102,7 @@ class ContainerParentForm extends Component {
           value={container.parentContainerId}
         />
         {renderContainerDisplay()}
-      </FormElement>
+      </div>
     );
   }
 }

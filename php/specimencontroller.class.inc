@@ -327,11 +327,19 @@ class SpecimenController
                 throw new \BadRequest('Parent Specimens must be of the same Type');
             }
 
-            if (!in_array($parentSpecimen->getTypeId(),
-                         $specimenTypes[$specimen->getTypeId()]['parentTypeIds'])
-            ) {
-                throw new \BadRequest('Parent Specimens must be of a type that
-                                       is a parent to the current Specimen type');
+            if ($parentSpecimen->getTypeId() != $specimen->getTypeId()) {
+                if (empty($specimenTypes[$specimen->getTypeId()]['parentTypeIds'])) {
+                    $childType  = $specimenTypes[$specimen->getTypeId()]['label'];
+                    $parentType = $specimenTypes[$parentSpecimen->getTypeId()]['label'];
+                    throw new \BadRequest("A specimen of type '$childType' cannot be derived
+                                           from a parent of type '$parentType'");
+                }
+                if (!in_array($parentSpecimen->getTypeId(),
+                             $specimenTypes[$specimen->getTypeId()]['parentTypeIds'])
+                ) {
+                    throw new \BadRequest('Parent Specimens must be of a type that
+                                           is a parent to the current Specimen type');
+                }
             }
         }
     }

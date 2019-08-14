@@ -101,6 +101,7 @@ class BiobankSpecimen extends Component {
                 onClose={this.props.clearAll}
                 show={editable.aliquotForm}
                 onSubmit={this.submitAliquotForm}
+                throwWarning={true}
               >
                 <FormElement>
                   <BiobankSpecimenForm
