@@ -93,12 +93,12 @@ class LabelEndpoint implements RequestHandlerInterface
             $params = $request->getQueryParams();
             $barcode = $params['barcode'];
             $type = $params['type'];
-            $zpl = "^XA,^FO330,80^BY1,^BCN,100,Y,Y,N,^CFA,20^A0N,30,29^BCN,100,Y,Y,N^FD$barcode^FS,^FO323,190,^CFA,20^A0N,30,29^FD$type^XZ";
-            $output = shell_exec('lp -d ZDesigner -o raw /var/www/loris/print/barcode.zpl');
-            $fp = fopen('/tmp/barcode.zpl', 'w');
+            $zpl = "^XA,^PR1,^FO330,80^BY1,^BCN,100,Y,Y,N,^CFA,20^A0N,40,35^BCN,100,Y,Y,N^FD$barcode^FS,^FO323,190,^CFA,20^A0N,30,29^FD$type^XZ";
+            // $output = shell_exec('lp -d ZDesigner -o raw /var/www/loris/print/barcode.zpl');
+            $fp = fopen('/var/www/loris/print/barcode.zpl', 'w');
             fwrite($fp, $zpl);
             fclose($fp);
-
+            $output = shell_exec('lp -d ZDesigner -o raw /var/www/loris/print/barcode.zpl');
             echo "<pre>$output</pre>";
             return new \LORIS\Http\Response\OK(); 
         }
