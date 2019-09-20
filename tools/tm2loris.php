@@ -80,20 +80,70 @@ if (!$centerID) {
     $centerID = insertCenter($defaultCenterName);
 }
 
-$newCandID = $DB->pselectOne(
-            "SELECT max(CandID) + 1
-             FROM candidate",
-            array()
-        );
-$newCandID = is_null($newCandID) ? 100000 : $newCandID;
-
 $projectID = getProjectID("CBigR");
 //get the list of ID for json attributes in LORIS DB
 $jsonIDs = getJsonID($jsonAttributes);
 
-// get the list of candidate to process and process
-// csv format = TM_donors.donor_number, LORISID (PSCID)
-if (($handle = fopen("testcandidate.csv", "r")) !== false) {
+// get the list of candidate from CRU to process and process
+processCRU($projectID, $centerID);
+
+// process data for QPN and others project
+processNonCRU($projectID, $centerID);
+
+
+function processCRU($projectID, $centerID)
+{ 
+    global $orConn;
+
+    // csv format = TM_donors.donor_number, LORISID (PSCID)
+    if (($handle = fopen("testcandidate.csv", "r")) !== false) {
+        $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
+            to_char(PREP_DATE, 'YYYY-MM-DD') as PREP_DATE,
+            PREP_BY, STORAGE_STATUS, s.INSTITUTION, COLLECTED_BY, QTY_UNITS,
+            SITE_OF_TISSUE, STORAGE_ADDRESS, QTY_ON_HAND, SAMPLE_CATEGORY,
+            to_char(COLLECTION_DATE, 'YYYY-MM-DD') as COLLECTION_DATE, SITE_CODE,
+            S.COMMENTS, D.SEX, FILE1,
+            to_char(DATE_OF_BIRTH, 'YYYY-MM-DD') as DATE_OF_BIRTH,
+            d.DONOR_NUMBER, s.EVENT_ID, e.EVENT_NAME,
+            to_char(e.EVENT_DATE,'YYYY-MM-DD') as EVENT_DATE, S.BANK_ID, BANK_NAME
+        FROM TM_SAMPLES S 
+        LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
+        LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
+        LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
+        WHERE D.DONOR_number = :tmID
+        AND SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')";
+        $stid    = oci_parse($orConn, $orQuery);
+
+        while (($data = fgetcsv($handle)) !== false) {
+            oci_bind_by_name($stid, ":tmID", $data[0]);
+            oci_execute($stid);
+            while (($tmRow = oci_fetch_assoc($stid)) != false ) {
+                // check if candidate exist
+                $candID = getCandidate($data[1], $centerID, $projectID, $tmRow);                
+
+                // adjust Attribute some values for ease of processing                
+                adjustAttribute($tmRow);
+ 
+                // check if sample already exist in Loris
+               if (!sampleExist($tmRow['SAMPLE_NUMBER'])) {
+                    $sessionID = getSessionID($candID, $tmRow['EVENT_NAME'], $centerID, $tmRow);  
+                   if ((substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') && 
+                        (substr($tmRow['STORAGE_ADDRESS'], 0, 5) != 'FRZ00')) {
+                        insertSample($tmRow, $candidate, $centerID, $session['ID'], $projectID);
+                    }
+                }
+                unset($tmRow);
+            }
+        }
+    fclose($handle);
+    }
+}
+
+function processNonCRU($projectID, $centerID)
+{ 
+    global $orConn;
+    
+    $alreadyProcessDonor = getDonorList();
     $orQuery = "SELECT S.SAMPLE_NUMBER, SAMPLE_TYPE, S.DISEASE_CODE, FT_CYCLES,
         to_char(PREP_DATE, 'YYYY-MM-DD') as PREP_DATE,
         PREP_BY, STORAGE_STATUS, s.INSTITUTION, COLLECTED_BY, QTY_UNITS,
@@ -101,83 +151,36 @@ if (($handle = fopen("testcandidate.csv", "r")) !== false) {
         to_char(COLLECTION_DATE, 'YYYY-MM-DD') as COLLECTION_DATE, SITE_CODE,
         S.COMMENTS, D.SEX, FILE1,
         to_char(DATE_OF_BIRTH, 'YYYY-MM-DD') as DATE_OF_BIRTH,
-        s.DONOR_ID, s.EVENT_ID, e.EVENT_NAME,
+        d.DONOR_NUMBER, s.EVENT_ID, e.EVENT_NAME,
         to_char(e.EVENT_DATE,'YYYY-MM-DD') as EVENT_DATE, S.BANK_ID, BANK_NAME
     FROM TM_SAMPLES S 
     LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
     LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
-    WHERE D.DONOR_number = :tmID
+    WHERE D.DONOR_number NOT IT ($alreadyProcessDonor)
     AND SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')";
     $stid    = oci_parse($orConn, $orQuery);
 
-    while (($data = fgetcsv($handle)) !== false) {
+    oci_execute($stid);
+    while (($tmRow = oci_fetch_assoc($stid)) != false ) {
         // check if candidate exist
-        $candidate = $DB->pselectOne(
-            "SELECT CandID
-             FROM candidate
-             WHERE PSCID = :pscID AND RegistrationCenterID = :centerID",
-            array(
-             'pscID'   => $data[1],
-             'centerID' => $centerID,
-            )
-        );
+        $candID = getCandidate('TM'.$tmRow['DONOR_NUMBER'], $centerID, $projectID, $tmRow);                
 
-//        if (!$candidate) {
-//            throw new LorisException('Candidate not define in LORIS'); //TODO to refine
-//        }
-
-$NBCand=0;
-
-        oci_bind_by_name($stid, ":tmID", $data[0]);
-        oci_execute($stid);
-        while (($tmRow = oci_fetch_assoc($stid)) != false ) {
-
-
-        if (empty($candidate['CandID']) && empty($candidate)) {
-            $candidate = insertCandidate($tmRow, $data[1], $newCandID++, $centerID, $userID, $projectID);
-        }
-
+        // adjust Attribute some values for ease of processing                
         adjustAttribute($tmRow);
-            // check if sample already exist in Loris
-            $sampleExist = $DB->pselectOne(
-                "SELECT COUNT(ContainerID)
-                 FROM biobank_container
-                 WHERE Barcode = :barcode",
-                array(':barcode' => $tmRow['SAMPLE_NUMBER'])
-            );
-            if ($sampleExist != 0) {
-                updateSample($tmRow, $centerID);
-            } else {
-                // check if session exist
-                $session['Visit_label'] = $tmRow['EVENT_NAME'];
-                $session['ID']          = $DB->pselectOne(
-                    "SELECT ID
-                     FROM session
-                     WHERE CandID = :candID AND Visit_label = :visit",
-                    array(
-                     ':candID' => $candidate,
-                     ':visit'  => $session['Visit_label'],
-                    )
-                );
-                if (!$session['ID']) {
-                    $session['ID'] = insertSession(
-                        $tmRow,
-                        $candidate,
-                        $userID,
-                        $centerID
-                    );
-                }
-                if ((substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') && 
-                    (substr($tmRow['STORAGE_ADDRESS'], 0, 5) != 'FRZ00')) {
-                    insertSample($tmRow, $candidate, $centerID, $session['ID'], $projectID);
-                }
+ 
+        // check if sample already exist in Loris
+        if (!sampleExist($tmRow['SAMPLE_NUMBER'])) {
+            $sessionID = getSessionID($candID, $tmRow['EVENT_NAME'], $centerID, $tmRow);  
+            if ((substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') && 
+                (substr($tmRow['STORAGE_ADDRESS'], 0, 5) != 'FRZ00')) {
+                insertSample($tmRow, $candidate, $centerID, $session['ID'], $projectID);
             }
-            unset($tmRow);
-        }
+       }
+    unset($tmRow);
     }
-    fclose($handle);
 }
+
 
 /**
  * Insert a candidate into LORIS
@@ -186,11 +189,13 @@ $NBCand=0;
  *
  * @return void
  */
-function insertCandidate(array $tmRow, string $pscid, int $newCandID, int $centerID, string $userID, int $projectID) : int
+function insertCandidate(array $tmRow, string $pscid, int $centerID, int $projectID) : int
 {
+    global $userID;
+
     $DB =& \Database::singleton();
 
-    $candidate['CandID']               = $newCandID;
+    $candidate['CandID']               = newCandID();
     $candidate['PSCID']                = $pscid;
     $candidate['active']               = 'Y';
     $candidate['RegistrationCenterID'] = $centerID;
@@ -198,6 +203,7 @@ function insertCandidate(array $tmRow, string $pscid, int $newCandID, int $cente
     $candidate['Testdate']             = $tmRow['EVENT_DATE']; // from TM
     $candidate['Entity_type']          = 'Human';
     $candidate['ProjectID']            = $projectID;
+    $candidate['ExternalID']           = $tmRow['DONOR_NUMBER'];
 
    $DB->insert("candidate", $candidate);
    $ID = $DB->getLastInsertID();
@@ -975,13 +981,13 @@ function getProtocolID($process, $label)
     $protocolID = $DB->pselectOne(
         $sql,
         array(
-         'label'   => '%'.$label.'%',
+         'label'   => '%'.substr($label, 3).'%',
 		 'process' => getProcessID($process)
          )
     );
-//    if (!$protocolID) {
-//        throw new LorisException("specimen_protocol inexistant: $process, $label"); 
-//    }
+    if (!$protocolID) {
+        throw new LorisException("specimen_protocol inexistant: $process, $label"); 
+    }
 
     return $protocolID;
 }
@@ -1058,3 +1064,81 @@ function getSpecimentTypeID($sampleType)
     }
     return $specimenTypeID;
 }
+
+function getCandidate($pscid, $centerID, $projectID, $tmRow)                
+{
+    global $userID;
+    $DB  =& \Database::singleton();
+
+    $candID = $DB->pselectOne(
+         "SELECT CandID
+         FROM candidate
+         WHERE ExternalID = :ExternalID AND RegistrationCenterID = :centerID",
+         array(
+            'ExternalID'   => $tmRow['DONOR_NUMBER'],
+            'centerID' => $centerID,
+         )
+    );
+    if (empty($candID)) {
+        $candID = insertCandidate($tmRow, $pscid, $centerID, $projectID);
+    }
+    return $candID;
+}
+
+function newCandID()
+{
+    $DB  =& \Database::singleton();
+ 
+    $candID = 0;
+    do {
+        $candID = rand(100000, 999999);
+    } while ($DB->pselectOne("SELECT CandID from candidate where CandID = $candID", array()));
+    return $candID;
+}
+
+function sampleExist($barcode)
+{
+    $DB  =& \Database::singleton();
+
+    return $DB->pselectOne(
+        "SELECT COUNT(ContainerID)
+        FROM biobank_container
+        WHERE Barcode = :barcode",
+        array(':barcode' => $barcode)
+    );
+} 
+
+function getSessionID($candID, $visitLabel, $centerID, $tmRow)
+{
+    global $userID;
+    $DB  =& \Database::singleton();
+
+    $sessionID = $DB->pselectOne(
+        "SELECT ID
+        FROM session
+        WHERE CandID = :candID AND Visit_label = :visit",
+        array(
+            ':candID' => $candID,
+            ':visit'  => $visitLabel,
+        )
+    );
+    if (!$sessionID) {
+        $sessionID = insertSession(
+            $tmRow,
+            $candID,
+            $userID,
+            $centerID
+       );
+    }
+    return $sessionID;
+}
+
+function getDonorList()
+{
+    $DB  =& \Database::singleton();
+
+    $donors = $DB->pselectCol("SELECT ExternalID FROM candidate", array());
+    return implode(",", array_values($donors));
+}
+
+
