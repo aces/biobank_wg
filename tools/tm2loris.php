@@ -22,11 +22,6 @@
 //TODO list:
 // adjust reading csv (excel?) file as needed
 // 
-// Add examinerID in biobank_specimen_XYZ  (Need to create users for CRU members)
-// 
-// Box size (2) for cryotank (CRYO-08S) for 5x5, others are 10x10
-// 
-// add date collected or processed in specimen windows
 
 
 require_once __DIR__ ."/cred.inc";  //Oracle DB credential
@@ -85,7 +80,7 @@ $projectID = getProjectID("CBigR");
 $jsonIDs = getJsonID($jsonAttributes);
 
 // get the list of candidate from CRU to process and process
-processCRU($projectID, $centerID);
+#processCRU($projectID, $centerID);
 
 // process data for QPN and others project
 processNonCRU($projectID, $centerID);
@@ -129,9 +124,12 @@ function processCRU($projectID, $centerID)
                     $sessionID = getSessionID($candID, $tmRow['EVENT_NAME'], $centerID, $tmRow);  
                    if ((substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') && 
                         (substr($tmRow['STORAGE_ADDRESS'], 0, 5) != 'FRZ00')) {
-                        insertSample($tmRow, $candidate, $centerID, $session['ID'], $projectID);
+                        insertSample($tmRow, $candID, $centerID, $sessionID, $projectID);
                     }
-                }
+                } else {
+        			print("*****ERROR sample already exist *****");
+        			print_r($tmRow);
+			    }
                 unset($tmRow);
             }
         }
@@ -157,12 +155,16 @@ function processNonCRU($projectID, $centerID)
     LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
     LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
-    WHERE D.DONOR_number NOT IT ($alreadyProcessDonor)
-    AND SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')";
+    WHERE S.SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')";
+// D.DONOR_number NOT IT ($alreadyProcessDonor) AND 
     $stid    = oci_parse($orConn, $orQuery);
-
     oci_execute($stid);
     while (($tmRow = oci_fetch_assoc($stid)) != false ) {
+		// check if already processed, 
+		if (in_array($tmRow['DONOR_NUMBER'], $alreadyProcessDonor)) {
+			continue;
+		}
+
         // check if candidate exist
         $candID = getCandidate('TM'.$tmRow['DONOR_NUMBER'], $centerID, $projectID, $tmRow);                
 
@@ -174,10 +176,18 @@ function processNonCRU($projectID, $centerID)
             $sessionID = getSessionID($candID, $tmRow['EVENT_NAME'], $centerID, $tmRow);  
             if ((substr($tmRow['STORAGE_ADDRESS'], 0, 7) != 'VIRTUAL') && 
                 (substr($tmRow['STORAGE_ADDRESS'], 0, 5) != 'FRZ00')) {
-                insertSample($tmRow, $candidate, $centerID, $session['ID'], $projectID);
+				try {
+	               insertSample($tmRow, $candID, $centerID, $sessionID, $projectID);
+				}
+				catch (Exception $e) {
+					echo '***** exception: *****',  $e->getMessage(), "\n";
+				}
             }
-       }
-    unset($tmRow);
+        } else {
+			print("*****ERROR sample already exist *****");
+			print_r($tmRow);
+        }
+        unset($tmRow);
     }
 }
 
@@ -323,7 +333,8 @@ function insertSample(array $tmRow, int $candID, $centerID, $sessionID, $project
     $sample['ContainerStatusID'] = getContainerStatus('Available');
     $sample['OriginCenterID']    = $centerID;
     $sample['CurrentCenterID']   = $centerID;
-    $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
+    $sample['DateTimeCreate']    = is_null($tmRow['COLLECTION_DATE']) ? "1970-01-01" : $tmRow['COLLECTION_DATE'];
+
 
     // insert containers
     $tmLocation  = explodeLocation(
@@ -443,125 +454,9 @@ function explodeLocation(string $storageAdress, string $barcode) : array
             $storageType = 'VIRTUAL';
             break;
         default:
+		die("invalid location $storageAdress\n");
     }
     return $tmLocation;
-}
-
-/**
- * Update the information for a sample.
- * check and modify as required:
- * - container location
- * - quantity
- * - freeze thaw cycle
- *
- * @param array $tmRow    row of data for Oracle DB
- * @param int   $centerID the ID of the center
- *
- * @return bool succes of the insertion
- */
-function updateSample(array $tmRow, $centerID)
-{
-    $DB =& \Database::singleton();
-
-    $sql     = "SELECT bs.SpecimenID, bs.Quantity, bc.Barcode, FreezeThawCycle,
-            bs.ContainerID as AliquotID, bc2.Barcode as ParentBarcode
-        FROM biobank_specimen bs
-        JOIN biobank_container bc ON bs.ContainerID = bc.ContainerID
-        JOIN biobank_container_parent bcp on bc.ContainerID = bcp.ContainerID
-        JOIN biobank_container bc2 ON bcp.ParentContainerID = bc2.ContainerID
-        LEFT JOIN biobank_specimen_freezethaw bsf ON bs.SpecimenID = bsf.SpecimenID
-        WHERE bc.Barcode = :barcode";
-    $current = $DB->pselectRow($sql, array('barcode' => $tmRow['SAMPLE_NUMBER']));
-
-    // check quantity and update if needed
-    if ($current['Quantity'] != $tmRow['QTY_ON_HAND']) {
-        //exception for null unit
-        if (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_TYPE'] == 'DNA') {
-            $tmRow['QTY_UNITS'] = "µL";
-            echo "Qty_Units null, DNA, assuming µL\n";
-        }
-        elseif (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_TYPE'] == 'Trizol lysate') {
-            $tmRow['QTY_UNITS'] = "10⁶/mL";
-            echo "Qty_Units null, Trizol lysate, assuming 10⁶/mL\n";
-        }
-
-        $DB->update(
-            'biobank_specimen',
-            array(
-             'Quantity' => $tmRow['QTY_ON_HAND'],
-             'UnitID'   => getUnitID($tmRow['QTY_UNITS']),
-            ),
-            array('SpecimenID' => $current['SpecimenID'])
-        );
-    }
-
-    // check location and update if needed
-    $newParent     = substr($tmRow['STORAGE_ADDRESS'], 0, -4);
-    $newCoordinate = substr($tmRow['STORAGE_ADDRESS'], -3);
-    if ($current['ParentBarcode'] != $newParent) {
-        // check if new base container exist
-        $sql = "SELECT bc.ContainerID
-            FROM biobank_container bc
-            WHERE bc.Barcode = :newParent";
-        $newParentContainerID = $DB->pselectOne(
-            $sql,
-            array('newParent' => $newParent)
-        );
-        if (empty($newParentContainerID)) {
-           $sample = array();
-            $sample['ContainerStatusID'] = getContainerStatus("Available");
-            $sample['OriginCenterID']    = $centerID;
-            $sample['CurrentCenterID']   = $centerID;
-            $sample['DateTimeCreate']    = $tmRow['COLLECTION_DATE'];
-
-            $tmLocation           = explodeLocation(
-                $tmRow['STORAGE_ADDRESS'],
-                $tmRow['SAMPLE_NUMBER']
-            );
-            $newParentContainerID = insertContainerStack($tmLocation, $sample, $projectID);
-        } else {
-            //check if location is empty
-            $sql = "SELECT bc.ContainerID, bcp.ParentContainerID
-                FROM biobank_container bc
-                LEFT JOIN biobank_container_parent bcp
-                WHERE bc.Barcode = :newLocation
-                AND bcp.Coordinate = :coordinate";
-            $newParentContainer = $DB->pselectCol(
-                $sql,
-                array(
-                 'newLocation' => $newParent,
-                 'coordinate'  => $newCoordinate,
-                )
-            );
-            if (!empty($newParentContainer)) {
-                //coordinate occupied
-                throw new LorisException('new coordinate occupied'); //TODO to refine
-            }
-        }
-        // update aliquot location
-        $DB->update(
-            'biobank_container_parent',
-            array(
-             'ParentContainerID' => $newParentContainerID,
-             'Coordinate'        => $newCoordinate,
-            ),
-            array('ContainerID' => $current['AliquotID'])
-        );
-    }
-
-    // check FreezeThawCycle and update if needed
-    if ($tmRow['FT_CYCLES'] != 0
-        && ( $current['FreezeThawCycle'] != $tmRow['FT_CYCLES'])
-    ) {
-        $DB->replace(
-            'biobank_specimen_freezethaw',
-            array(
-             'SpecimenID'      => $current['SpecimenID'],
-             'FreezeThawCycle' => $tmRow['FT_CYCLES'],
-            )
-        );
-    }
-
 }
 
 /**
@@ -622,7 +517,7 @@ function insertContainer(
 
     if (!empty($exist)) {
         if ($exclusive === true) {
-            throw new LorisException('Barcode already taken');
+			throw new LorisException('Barcode already taken');
         } else {
             return $exist;
         }
@@ -647,14 +542,20 @@ print("label: {$container['Label']}\n");
 
     //parent container
     if ($parent !== null) {
-        $DB->insert(
-            'biobank_container_parent',
-            array(
-             'ContainerID'       => $containerID,
-             'ParentContainerID' => $parent,
-             'Coordinate'        => $container['location'],
-            )
-        );
+        try {        
+            $DB->insert(
+                'biobank_container_parent',
+                array(
+                 'ContainerID'       => $containerID,
+                 'ParentContainerID' => $parent,
+                 'Coordinate'        => $container['location'],
+                )
+            );
+        }
+        catch (Exception $e) {
+                    echo '***** exception: *****',  $e->getMessage(), "\n";
+        }
+
     }
 
     //associate with project
@@ -951,6 +852,10 @@ function adjustAttribute(&$tmRow) : void
         $tmRow['SITE_OF_TISSUE'] = null;
     }
         
+	// unitID   
+	if (is_null($tmRow['QTY_UNITS']) && $tmRow['SAMPLE_CATEGORY'] == 'BB-P-0010') {
+		$tmRow['QTY_UNITS'] = "µL";
+	}
 }
 
 function getProjectID($project) : string
@@ -1137,8 +1042,8 @@ function getDonorList()
 {
     $DB  =& \Database::singleton();
 
-    $donors = $DB->pselectCol("SELECT ExternalID FROM candidate", array());
-    return implode(",", array_values($donors));
+    return $DB->pselectCol("SELECT ExternalID FROM candidate", array());
+//    return implode(",", array_values($donors));
 }
 
 
