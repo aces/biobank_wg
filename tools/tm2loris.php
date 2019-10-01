@@ -106,7 +106,8 @@ function processCRU($projectID, $centerID)
         LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
         LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
         WHERE D.DONOR_number = :tmID
-        AND SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')";
+        AND SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')
+        AND STORAGE_STATUS = 'Available'";
         $stid    = oci_parse($orConn, $orQuery);
 
         while (($data = fgetcsv($handle)) !== false) {
@@ -155,7 +156,8 @@ function processNonCRU($projectID, $centerID)
     LEFT JOIN TM_DONORS D ON S.DONOR_ID = D.DONOR_ID 
     LEFT JOIN TM_DONOR_EVENTS e ON s.EVENT_ID = e.EVENT_ID
     LEFT JOIN TM_BANKS B on s.BANK_ID = B.BANK_ID
-    WHERE S.SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')";
+    WHERE S.SAMPLE_CATEGORY IN ('BB-P-0001', 'BB-P-0002', 'BB-P-0003', 'BB-P-0010')
+    AND STORAGE_STATUS = 'Available'";
 // D.DONOR_number NOT IT ($alreadyProcessDonor) AND 
     $stid    = oci_parse($orConn, $orQuery);
     oci_execute($stid);
