@@ -2,7 +2,7 @@
 INSERT INTO biobank_unit (Label)
 VALUES 	('µL'), 
         ('mL'),
-		(x 10e6 cells)
+        ('x 10e6 cells')
 ;
 
 INSERT INTO biobank_container_capacity (Quantity, UnitId)
@@ -152,6 +152,58 @@ VALUES ('Blood Collection',
         (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='Saliva')
        ),
        ('CBIG-P-0010 (CSF Preparation)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Preparation'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='CSF')
+       ),
+       ('BB-P-0002 (DNA Extraction from Whole Blood)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='DNA')
+       ),
+       ('BB-P-0009 (DNA Extraction from Saliva)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='DNA')
+       ),
+       ('BB-P-0001 (PBMC Isolation)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='PBMC')
+       ),
+       ('BB-P-0014 (PBMC via Leucosep)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='PBMC')
+       ),
+        ('BB-P-0017 (PBMC via Leucosep)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='PBMC')
+       ),
+       ('BB-P-0003 (Serum Isolation)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='Serum')
+       ),
+       ('BB-P-0010 (CSF Collection)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='CSF')
+       ),
+       ('BB-P-0006 (Fibroblast Culture)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='Fibroblast')
+       ),
+       ('BB-P-0007 (Skin Biopsy)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Collection'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='Skin Biopsy')
+       ),
+       ('Blood Processing for PBMC (BB-P-0001)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Preparation'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='Blood')
+       ),
+       ('Blood Processing for Serum (BB-P-0003)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Preparation'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='Blood')
+       ),
+       ('Blood Processing for DNA (BB-P-0002)',
+        (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Preparation'),
+        (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='Blood')
+       ),
+       ('BB-P-0010 (CSF Preparation)',
         (SELECT SpecimenProcessID FROM biobank_specimen_process WHERE Label='Preparation'),
         (SELECT SpecimenTypeID FROM biobank_specimen_type WHERE Label='CSF')
        )
