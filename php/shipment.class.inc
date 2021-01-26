@@ -36,21 +36,33 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * These properties describe a shipment entity.
      *
-     * @var string    $id
-     * @var string    $trackingNumber
-     * @var string    $originCenter
-     * @var string    $destinationCenter
+     * @var string  $id
+     * @var string  $barcode
+     * @var string  $originCenter
+     * @var string  $destinationCenter
+     * @var array   $containers
+     * @var array   $logs
      */
     private $id;
-    private $trackingNumber;
+    private $barcode;
     private $originCenter;
     private $destinationCenter;
+    private $status;
+    private $containers;
+    private $logs;
 
     /**
      * Initiliazes a new instance of the Shipment Class
      */
-    function __construct()
+    function __construct(array $data)
     {
+        $this->setId((int) ($data['id']));                                              
+        $this->setBarcode((string) $data['barcode']);
+        $this->setOriginCenter((string) $data['originCenter']);                            
+        $this->setDestinationCenter((string) $data['destinationCenter']);
+        $this->setStatus((string) $data['status']);
+        $this->setContainers((array) $data['containers']);
+        $this->setLogs((array) $data['logs']);
     }
 
     /**
@@ -60,7 +72,7 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @return void
      */
-    public function setId(int $id) : void
+    private function setId(int $id) : void
     {
         if ($id > 0) {
             $this->id = $id;
@@ -80,13 +92,13 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Sets the tracking number of the shipment
      *
-     * @param string $trackingNumber the shipment's tracking number
+     * @param string $barcode the shipment's tracking number
      *
      * @return void
      */
-    public function setTrackingNumber(string $trackingNumber) : void
+    private function setBarcode(string $barcode) : void
     {
-        $this->trackingNumber = $trackingNumber;
+        $this->barcode = $barcode;
     }
 
     /**
@@ -94,9 +106,9 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @return string
      */
-    public function getTrackingNumber() : string
+    public function getBarcode() : string
     {
-        return $this->trackingNumber;
+        return $this->barcode;
     }
 
     /**
@@ -106,7 +118,7 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @return void
      */
-    public function setOriginCenter(string $originCenter) : void
+    private function setOriginCenter(string $originCenter) : void
     {
         $this->originCenter = $originCenter;
     }
@@ -128,7 +140,7 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @return void
      */
-    public function setDestinationCenter(string $destinationCenter) : void
+    private function setDestinationCenter(string $destinationCenter) : void
     {
         $this->destinationCenter = $destinationCenter;
     }
@@ -143,22 +155,71 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
         return $this->destinationCenter;
     }
 
-    /**                                                                         
-     * Loads a Shipment Object from an array.
-     *                                                                          
-     * @param array $data Data to be used to load the Shipment Object.             
-     *                                                                          
-     * @return Shipment                             
-     */                                                                         
-    public function fromArray(array $data) : Shipment                    
-    {                                                                           
-        $this->setId((int) ($data['id']));                                              
-        $this->setTrackingNumber((string) $data['trackingNumber']);
-        $this->setOriginCenter((string) $data['originCenter']);                            
-        $this->setDestinationCenter((string) $data['destinationCenter']);
+    /**
+     * Sets the status of the shipment
+     *
+     * @param string $status
+     *
+     * @return void
+     */
+    private function setStatus(string $status) : void
+    {
+        $this->status = $status;
+    }
 
-        return $this;                                                           
-    }                                                                           
+    /**
+     * Gets the status of the shipment
+     *
+     * @return string
+     */
+    public function getStatus() : string
+    {
+        return $this->status;
+    }
+
+    /**
+     * Sets the containers for the shipment
+     *
+     * @param array $containers the shipment's containers
+     *
+     * @return void
+     */
+    private function setContainers(array $containers) : void
+    {
+        $this->containers = $containers;
+    }
+
+    /**
+     * Gets the containers of the shipment
+     *
+     * @return array
+     */
+    public function getContainers() : array
+    {
+        return $this->containers;
+    }
+
+    /**
+     * Sets the logs for the shipment
+     *
+     * @param array $logs the shipment's logs
+     *
+     * @return void
+     */
+    private function setLogs(array $logs) : void
+    {
+        $this->logs = $logs;
+    }
+
+    /**
+     * Gets the logs of the shipment
+     *
+     * @return array
+     */
+    public function getLogs() : array
+    {
+        return $this->logs;
+    }
                                                                                 
     /**                                                                         
      * A wrapper function for the jsonSerialize method of the Shipment Instance 
@@ -180,9 +241,12 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     {
         return array(
                 'id'                => $this->id,
-                'trackingNumber'    => $this->trackingNumber,
+                'barcode'           => $this->barcode,
                 'originCenter'      => $this->originCenter,
                 'destinationCenter' => $this->destinationCenter,
+                'containers'        => $this->containers,
+                'status'            => $this->status,
+                'logs'              => $this->logs,
                );
     }
 

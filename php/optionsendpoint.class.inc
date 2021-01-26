@@ -113,6 +113,7 @@ class OptionsEndpoint implements RequestHandlerInterface
     {
         $contCont = new ContainerController($db, $user);
         $specCont = new SpecimenController($db, $user);
+        $shipCont = new ShipmentController($db, $user);
 
         // XXX: This should eventually be replaced by a call directly to a
         // Candidate endpoint or Candidate controller that will be able to
@@ -189,6 +190,7 @@ class OptionsEndpoint implements RequestHandlerInterface
                 'sessionCenters'    => $sessionCenters,
                 'container'         => $contCont->getOptions(),
                 'specimen'          => $specCont->getOptions(),
+                'shipment'          => $shipCont->getOptions(),
                );
     }
 }

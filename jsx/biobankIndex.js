@@ -33,6 +33,9 @@ class BiobankIndex extends React.Component {
         projects: {},
         sessionCenters: {},
         sessions: {},
+        shipment: {
+          statuses: {},
+        },
         specimen: {
           types: {},
           typeUnits: {},

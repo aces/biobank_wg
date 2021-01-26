@@ -1,4 +1,4 @@
-import React, {Component} from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 
 import {Tabs, TabPane} from 'Tabs';
@@ -8,84 +8,83 @@ import ContainerTab from './containerTab';
 import PoolTab from './poolTab';
 import ShipmentTab from './shipmentTab';
 
-class BiobankFilter extends Component {
-  render() {
-    const specimenTab = (
-      <SpecimenTab
-        data={this.props.data}
-        options={this.props.options}
-        saveBatchEdit={this.props.saveBatchEdit}
-        createPool={this.props.createPool}
-        createSpecimens={this.props.createSpecimens}
-        updateSpecimens={this.props.updateSpecimens}
-        editSpecimens={this.props.editSpecimens}
-        history={this.props.history}
-        increaseCoordinate={this.props.increaseCoordinate}
-        loading={this.props.loading}
-      />
-    );
+function BiobankFilter(props) {
+  const specimenTab = (
+    <SpecimenTab
+      data={props.data}
+      options={props.options}
+      saveBatchEdit={props.saveBatchEdit}
+      createPool={props.createPool}
+      createSpecimens={props.createSpecimens}
+      updateSpecimens={props.updateSpecimens}
+      editSpecimens={props.editSpecimens}
+      history={props.history}
+      increaseCoordinate={props.increaseCoordinate}
+      loading={props.loading}
+    />
+  );
 
-    const containerTab = (
-      <ContainerTab
-        data={this.props.data}
-        options={this.props.options}
-        createContainers={this.props.createContainers}
-        history={this.props.history}
-        loading={this.props.loading}
-      />
-    );
+  const containerTab = (
+    <ContainerTab
+      data={props.data}
+      options={props.options}
+      createContainers={props.createContainers}
+      history={props.history}
+      loading={props.loading}
+    />
+  );
 
-    const poolTab = (
-      <PoolTab
-        data={this.props.data}
-        options={this.props.options}
-        createSpecimens={this.props.createSpecimens}
-        increaseCoordinate={this.props.increaseCoordinate}
-        loading={this.props.loading}
-      />
-    );
+  const poolTab = (
+    <PoolTab
+      data={props.data}
+      options={props.options}
+      createSpecimens={props.createSpecimens}
+      increaseCoordinate={props.increaseCoordinate}
+      loading={props.loading}
+    />
+  );
 
-    const shipmentTab = (
-      <ShipmentTab
-        data={this.props.data}
-        loading={this.props.loading}
-      />
-    );
+  const shipmentTab = (
+    <ShipmentTab
+      data={props.data}
+      options={props.options}
+      loading={props.loading}
+    />
+  );
 
-    const tabInfo = [];
-    const tabList = [];
-    if (loris.userHasPermission('biobank_specimen_view')) {
-      tabInfo.push({id: 'specimens', content: specimenTab});
-      tabList.push({id: 'specimens', label: 'Specimens'});
-    }
-    if (loris.userHasPermission('biobank_container_view')) {
-      tabInfo.push({id: 'containers', content: containerTab});
-      tabList.push({id: 'containers', label: 'Containers'});
-    }
-    if (loris.userHasPermission('biobank_pool_view')) {
-      tabInfo.push({id: 'pools', content: poolTab});
-      tabList.push({id: 'pools', label: 'Pools'});
-    }
-
-    tabInfo.push({id: 'shipments', content: shipmentTab});
-    tabList.push({id: 'shipments', label: 'Shipments'});
-
-    const tabContent = Object.keys(tabInfo).map((key) => {
-      return (
-        <TabPane key={key} TabId={tabInfo[key].id}>
-          {tabInfo[key].content}
-        </TabPane>
-      );
-    });
-
-    return (
-      <div id='biobank-page'>
-        <Tabs tabs={tabList} defaultTab={tabList[0].id} updateURL={true}>
-          {tabContent}
-        </Tabs>
-      </div>
-    );
+  const tabInfo = [];
+  const tabList = [];
+  if (loris.userHasPermission('biobank_specimen_view')) {
+    tabInfo.push({id: 'specimens', content: specimenTab});
+    tabList.push({id: 'specimens', label: 'Specimens'});
   }
+  if (loris.userHasPermission('biobank_container_view')) {
+    tabInfo.push({id: 'containers', content: containerTab});
+    tabList.push({id: 'containers', label: 'Containers'});
+  }
+  if (loris.userHasPermission('biobank_pool_view')) {
+    tabInfo.push({id: 'pools', content: poolTab});
+    tabList.push({id: 'pools', label: 'Pools'});
+  }
+
+  tabInfo.push({id: 'shipments', content: shipmentTab});
+  tabList.push({id: 'shipments', label: 'Shipments'});
+
+  const tabContent = Object.keys(tabInfo).map((key) => {
+    return (
+      <TabPane key={key} TabId={tabInfo[key].id}>
+        {tabInfo[key].content}
+      </TabPane>
+    );
+  });
+
+  return (
+    <div id='biobank-page'>
+      <Tabs tabs={tabList} defaultTab={tabList[0].id} updateURL={true}>
+        {tabContent}
+      </Tabs>
+    </div>
+  );
 }
 
 BiobankFilter.propTypes = {

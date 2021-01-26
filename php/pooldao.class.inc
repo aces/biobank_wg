@@ -50,7 +50,7 @@ class PoolDAO extends \LORIS\Data\ProvisionerInstance
         $this->db = $db;
     }
 
-    // XXX: I'm not sure if this function is really necessary since it is only
+    // XXX: I'm not sure if rhis function is really necessary since it is only
     // being used once, and should likely not be accessed outside this class.
     /**
      * This method is used when the DAO class needs to create new Pool
@@ -58,9 +58,9 @@ class PoolDAO extends \LORIS\Data\ProvisionerInstance
      *
      * @return Pool
      */
-    private function getInstance() : Pool
+    private function getInstance($pool) : Pool
     {
-        return new Pool();
+        return new Pool($pool);
     }
 
     /**
@@ -90,17 +90,19 @@ class PoolDAO extends \LORIS\Data\ProvisionerInstance
      */
     public function selectInstances(?array $conditions = [], $operator = 'AND') : array
     {
-        $query = "SELECT bp.PoolID,
-                         bp.Label,
-                         bp.Quantity,
-                         bp.UnitID,
-                         GROUP_CONCAT(bspr.SpecimenID) as SpecimenIDs,
-                         bp.CenterID,
-                         bp.Date,
-                         DATE_FORMAT(bp.Time, '%H:%i') as Time
+        $query = "SELECT bp.PoolID as id,
+                         bp.Label as label,
+                         bp.Quantity as quantity,
+                         bu.Label as unit,
+                         GROUP_CONCAT(bspr.SpecimenID) as specimenIds,
+                         psc.Name as center,
+                         bp.Date as date,
+                         DATE_FORMAT(bp.Time, '%H:%i') as time
                   FROM   biobank_pool bp
+                  LEFT JOIN biobank_unit bu USING (UnitID)
                   LEFT JOIN biobank_specimen_pool_rel bspr
-                    USING (PoolID)";
+                    USING (PoolID)
+                  LEFT JOIN psc USING (CenterID)";
         if (!empty($conditions)) {
             $whereClause = [];
             foreach ($conditions as $condition) {
@@ -109,20 +111,21 @@ class PoolDAO extends \LORIS\Data\ProvisionerInstance
             $query .= ' WHERE '.implode(" $operator ", $whereClause);
         }
         $query .= ' GROUP BY bp.PoolID';
-        $poolRows = $this->db->pselectWithIndexKey($query, [], 'PoolID');
+        $poolRows = $this->db->pselectWithIndexKey($query, [], 'id');
 
         $pools  = array();
         $specimenDAO = new SpecimenDAO($this->db);
         if (!empty($poolRows)) {
             foreach ($poolRows as $id => $poolRow) {
-                $specimenIds = explode(',', $poolRow['SpecimenIDs']);
+                $specimenIds = explode(',', $poolRow['specimenIds']);
                 $specimenId  = (int) $specimenIds[0];
                 $specimen    = $specimenDAO->selectInstances([['column'=>'SpecimenID', 'value'=>$specimenId]])[$specimenId];
-                $poolRow['CandidateID'] = $specimen->getCandidateId();
-                $poolRow['SessionID']   = $specimen->getSessionId();
-                $poolRow['TypeID']      = $specimen->getTypeId();
+                $poolRow['candidateId'] = $specimen->getCandidateId();
+                $poolRow['sessionId']   = $specimen->getSessionId();
+                $poolRow['typeId']      = $specimen->getTypeId();
+                $poolRow['specimenIds'] = $specimenIds;
 
-                $pools[$id] = $this->getInstanceFromSQL($poolRow, $specimenIds);
+                $pools[$id] = $this->getInstance($poolRow);
             }
         }
 
@@ -204,8 +207,8 @@ class PoolDAO extends \LORIS\Data\ProvisionerInstance
                      'PoolID'   => $pool->getId(),
                      'Label'    => $pool->getLabel(),
                      'Quantity' => $pool->getQuantity(),
-                     'UnitID'   => $pool->getUnitId(),
-                     'CenterID' => $pool->getCenterId(),
+                     'UnitID'   => $pool->getUnit(),
+                     'CenterID' => (new \Site($pool->getCenter()))->getCenterID(),
                      'Date'     => $pool->getDate()->format('Y-m-d'),
                      'Time'     => $pool->getTime()->format('H:i'),
                     );
@@ -222,33 +225,5 @@ class PoolDAO extends \LORIS\Data\ProvisionerInstance
                 'biobank_pool'              => $poolData,
                 'biobank_specimen_pool_rel' => $specimenPoolData,
                );
-    }
-
-    /**
-     * This function takes an array that resulted from an SQL query and
-     * instantiates it as a Pool Object
-     *
-     * @param array $data        Values to be reassigned.
-     * @param array $specimenIds List of specimen IDs associated with the given
-     *                           Pool.
-     *
-     * @return Pool
-     */
-    private function getInstanceFromSQL(array $data, array $specimenIds) : Pool
-    {
-        $pool = new Pool();
-        isset($data['PoolID'])      && $pool->setId((int) $data['PoolID']);
-        isset($data['Label'])       && $pool->setLabel((string) $data['Label']);
-        isset($data['Quantity'])    && $pool->setQuantity((float) $data['Quantity']);
-        isset($data['UnitID'])      && $pool->setUnitId((int) $data['UnitID']);
-        !empty($specimenIds)        && $pool->setSpecimenIds($specimenIds);
-        isset($data['CandidateID']) && $pool->setCandidateId((int) $data['CandidateID']);
-        isset($data['SessionID'])   && $pool->setSessionId((int) $data['SessionID']);
-        isset($data['TypeID'])      && $pool->setTypeId((int) $data['TypeID']);
-        isset($data['CenterID'])    && $pool->setCenterId((int) $data['CenterID']);
-        isset($data['Date'])        && $pool->setDate(new \DateTime($data['Date']));
-        isset($data['Time'])        && $pool->setTime(new \DateTime($data['Time']));
-
-        return $pool;
     }
 }

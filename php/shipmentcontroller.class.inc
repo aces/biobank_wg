@@ -111,6 +111,11 @@ class ShipmentController
         return $this->dao->saveInstance($shipment);
     }
 
+    public function getOptions() : array
+    {
+        return ['statuses' => $this->dao->getStatuses()];
+    }
+
     /**
      * Treats the Shipment DAO as a Provisioner that can be iteratated
      * through to provide the permissable Shipment Objects for the current User.
@@ -164,14 +169,14 @@ class ShipmentController
      */
     private function validateInstance(Shipment $shipment) : void
     {
-        $this->validateTrackingNumber($shipment);
+        $this->validateBarcode($shipment);
         $this->validateOriginCenter($shipment);
         $this->validateDestinationCenter($shipment);
         // $this->validateLogs($shipment);
     }
 
     /**
-     * Validates Shipment Object Tracking Number.
+     * Validates Shipment Object Barcode.
      *
      * @param Shipment $shipment Shipment to be validated.
      *
@@ -179,10 +184,10 @@ class ShipmentController
      *
      * @return void
      */
-    private function validateTrackingNumber(Shipment $shipment) : void
+    private function validateBarcode(Shipment $shipment) : void
     {
-        if (is_null($shipment->getTrackingNumber())) {
-            throw new \BadRequest("Shipment Tracking Number value must be set");
+        if (is_null($shipment->getBarcode())) {
+            throw new \BadRequest("Shipment Barcode value must be set");
         }
     }
 

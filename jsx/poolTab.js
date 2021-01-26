@@ -41,8 +41,6 @@ class PoolTab extends Component {
         });
       case 'Type':
         return options.specimen.types[value].label;
-      case 'Site':
-        return options.centers[value];
       default:
         return value;
     }
@@ -116,17 +114,19 @@ class PoolTab extends Component {
       return [
         pool.id,
         pool.label,
-        Math.round(pool.quantity*100)/100+' '+options.specimen.units[pool.unitId].label,
+        Math.round(pool.quantity*100)/100+' '+pool.unit,
         pool.specimenIds,
         options.candidates[pool.candidateId].pscid,
         options.sessions[pool.sessionId].label,
         pool.typeId,
-        pool.centerId,
+        pool.center,
         pool.date,
         pool.time,
       ];
     });
 
+    const centers = {};
+    Object.values(options.centers).forEach((value) => centers[value] = value);
     const fields = [
       {label: 'ID', show: false},
       {label: 'Label', show: true, filter: {
@@ -151,7 +151,7 @@ class PoolTab extends Component {
       {label: 'Site', show: true, filter: {
         name: 'site',
         type: 'select',
-        options: options.centers,
+        options: centers,
       }},
       {label: 'Date', show: true},
       {label: 'Time', show: true},

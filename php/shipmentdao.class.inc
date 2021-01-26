@@ -46,35 +46,31 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
     function __construct(\Database $db)
     {
         $this->db = $db;
-        // TODO: Not sure if this should default be queried....
-        $this->centers = \Utility::getSiteList();
     }
 
-    // XXX: I'm not sure if this function is really necessary since it is only
-    // being used once, and should likely not be accessed outside this class.
     /**
      * This method is used when the DAO class needs to create a new Shipment
      * instance.
      *
      * @return Shipment
      */
-    private function getInstance() : Shipment
+    private function getInstance($shipmentArray) : Shipment
     {
-        return new Shipment();
+        return new Shipment($shipmentArray);
     }
 
     /**
      * This will load all shipment persistence variables from the database for a
      * given $id into a Shipment object, and return the object.
      *
-     * @param int $id Value of the $id for the Shipment that will be
-     *                instantiated
+     * @param string $barcode Value of the $barocde for the Shipment that will be
+     *                        instantiated
      *
      * @return Shipment $shipment Shipment Instance.
      */
-    public function getInstanceFromId(int $id) : Shipment
+    public function getInstanceFromBarcode(int $barcode) : Shipment
     {
-        return $this->selectInstances([['column'=>'ShipmentID', 'value'=>$id]])[$id];
+        return $this->selectInstances([['column'=>'Barcode', 'value'=>$barcode]])[$barcode];
     }
 
     /**
@@ -88,11 +84,17 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     public function selectInstances(?array $conditions = [], $operator = 'AND') : array
     {
-        $query = "SELECT s.ShipmentID,
-                         s.TrackingNumber,
-                         s.OriginCenterID,
-                         s.DestinationCenterID
-                  FROM shipment s";
+        $query = "SELECT s.ShipmentID as id,
+                         s.Barcode as barcode,
+                         psc.Name as destinationCenter,
+                         GROUP_CONCAT(bc.Barcode) as containers
+                  FROM shipment s
+                  LEFT JOIN psc psc
+                    ON (s.DestinationCenterID=psc.CenterID)
+                  LEFT JOIN biobank_container_shipment_rel bcsr
+                    ON (s.ShipmentID=bcsr.ShipmentID)
+                  LEFT JOIN biobank_container bc
+                    ON (bcsr.ContainerID=bc.ContainerID)";
         if (!empty($conditions)) {
             $whereClause = [];
             foreach($conditions as $condition) {
@@ -102,17 +104,48 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
         }
         $query .= " GROUP BY s.ShipmentID";
 
-        $shipmentRows = $this->db->pselectWithIndexKey($query, [], 'TrackingNumber');
-
-        $shipments = array();
-        if (!empty($shipmentRows)) {
-            foreach ($shipmentRows as $id => $shipmentRow) {
-                $shipment       = $this->getInstanceFromSQL($shipmentRow);
-                $shipments[$id] = $shipment;
-            }
+        $shipments = [];
+        $shipmentRows = $this->db->pselectWithIndexKey($query, [], 'barcode');
+        $logs = $this->getLogs();
+        foreach ($shipmentRows as $barcode => $shipmentRow) {
+            $shipmentRow['containers'] = $shipmentRow['containers'] ?
+              explode(',', $shipmentRow['containers']) : [];
+            $shipmentRow['logs'] = $logs[$barcode];
+            $shipmentRow['originCenter'] = $shipmentRow['logs'][0]['center'];
+            $shipmentRow['status'] = $logs[$barcode][array_key_last($logs[$barcode])]['status'];
+            $shipment = new Shipment($shipmentRow);
+            $shipments[$barcode] = $shipment;
         }
 
         return $shipments;
+    }
+
+    public function getLogs() : array
+    {
+        $query = "SELECT s.Barcode as barcode,
+                         psc.Name as center,
+                         u.Real_name as user,
+                         ss.Label as status,
+                         sl.Temperature as temperature,
+                         sl.Date as date,
+                         sl.Time as time
+                  FROM shipment_log sl
+                  LEFT JOIN shipment s
+                    ON (sl.ShipmentID=s.ShipmentID)
+                  LEFT JOIN psc
+                    ON (sl.CenterID=psc.CenterID)
+                  LEFT JOIN users u
+                    ON (sl.UserID=u.UserID)
+                  LEFT JOIN shipment_status ss
+                    ON (sl.StatusID=ss.StatusID)
+                  ORDER BY date, time";
+        $logRows = $this->db->pselectWithIndexKey($query, [], 'barcode');
+
+        $logs = [];
+        foreach ($logRows as $barcode => $logRow) {
+            $logs[$barcode][] = $logRow; 
+        }
+        return $logs;
     }
 
     /**
@@ -124,6 +157,12 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
     protected function getAllInstances() : \Traversable
     {
         return new \ArrayIterator($this->selectInstances());
+    }
+
+    public function getStatuses() : array
+    {
+        $query = "SELECT Label as label, Label FROM shipment_status";
+        return $this->db->pselectColWithIndexKey($query, [], 'label');
     }
 
     /**
@@ -162,40 +201,10 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     private function getSQLFromInstance(Shipment $shipment) : array
     {
-        // TODO: move to own function
-        $centers = array_flip($this->centers);
-        $originCenterId = $centers[$shipment->getOriginCenter()];
-        $destinationCenterId = $centers[$shipment->getDestinationCenter()];
-
         return array(
                      'ShipmentID'          => $shipment->getId(),
-                     'TrackingNumber'      => $shipment->getTrackingNmber(),
-                     'OriginCenterID'      => $originCenterId,
-                     'DestinationCenterID' => $destinationCenterId,
+                     'Barcode'             => $shipment->getBarcode(),
+                     'DestinationCenterID' => $shipment->getDestinationCenter(),
                     );
-    }
-
-    /**
-     * This function takes an array that resulted from an SQL query and
-     * instantiates it as a Shipment Object.
-     *
-     * @param array $data       Values to be converted to array.
-     *
-     * @return Shipment 
-     */
-    private function getInstanceFromSQL(array $data) : Shipment
-    {
-        // TODO: move to own function
-        print_r($this->centers);
-        $originCenter = (int) $this->centers[$data['OriginCenterID']];
-        $destinationCenter = (int) $this->center[$data['DestinationCenterID']];
-
-        $shipment = $this->getInstance();
-        $shipment->setId((int) $data['ShipmentID']);
-        $shipment->setTrackingNumber((string) $data['TrackingNumber']);
-        $shipment->setOriginCenter((string) $originCenter);
-        $shipment->setDestinationCenter((string) $destinationCenter);
-
-        return $shipment;
     }
 }
