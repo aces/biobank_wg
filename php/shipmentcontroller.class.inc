@@ -77,21 +77,18 @@ class ShipmentController
      * the saved containers are set to the shipment instances which are then
      * sent to the DAO to be saved.
      *
-     * @param array $list a list of shipment and container arrays to be created.
+     * @param array $shipmentArray a list of shipment and container arrays to be created.
      *
      * @return array $shipment a list of shipment objects that were created.
      */
-    public function createInstances(array $list) : array
+    public function createInstance(array $shipmentArray) : array
     {
-        $this->validatePermision('create');
-        $shipments = array();
-        foreach ($list as $i => $shipmentArray) {
-            $shipment = (new Shipment())->fromArray($shipmentArray);
-            $this->validateInstance($shipment);
-            $shipments[] = $this->dao->saveInstance($shipment);
-        }
+        $this->validatePermission('create');
+        $shipment = new Shipment($shipmentArray);
+        $this->validateInstance($shipment);
+        $shipment = $this->dao->saveInstance($shipment);
 
-        return $shipments;
+        return $shipment;
     }
 
     /**

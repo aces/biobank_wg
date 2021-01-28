@@ -111,8 +111,6 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
             $shipmentRow['containers'] = $shipmentRow['containers'] ?
               explode(',', $shipmentRow['containers']) : [];
             $shipmentRow['logs'] = $logs[$barcode];
-            $shipmentRow['originCenter'] = $shipmentRow['logs'][0]['center'];
-            $shipmentRow['status'] = $logs[$barcode][array_key_last($logs[$barcode])]['status'];
             $shipment = new Shipment($shipmentRow);
             $shipments[$barcode] = $shipment;
         }
@@ -186,7 +184,7 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
             $shipmentSQL
         );
 
-        return $this->getInstanceFromId($shipment->getId());
+        return $this->getInstanceFromBarcode($shipment->getBarcode());
     }
 
     /**
@@ -201,10 +199,14 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     private function getSQLFromInstance(Shipment $shipment) : array
     {
-        return array(
-                     'ShipmentID'          => $shipment->getId(),
-                     'Barcode'             => $shipment->getBarcode(),
-                     'DestinationCenterID' => $shipment->getDestinationCenter(),
-                    );
+        print_r($shipment->getDestinationCenter());
+        $destinationCenterID = $this->db->pselectOne(
+          'SELECT CenterID FROM psc WHERE Name=:name', ['name'=>$shipment->getDestinationCenter()]
+        );
+        return [
+                'ShipmentID'          => $shipment->getId(),
+                'Barcode'             => $shipment->getBarcode(),
+                'DestinationCenterID' => $destinationCenterID,
+               ];
     }
 }

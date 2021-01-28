@@ -56,13 +56,16 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     function __construct(array $data)
     {
-        $this->setId((int) ($data['id']));                                              
+        isset($data['id']) && $this->setId((int) ($data['id']));                                              
         $this->setBarcode((string) $data['barcode']);
-        $this->setOriginCenter((string) $data['originCenter']);                            
         $this->setDestinationCenter((string) $data['destinationCenter']);
-        $this->setStatus((string) $data['status']);
         $this->setContainers((array) $data['containers']);
         $this->setLogs((array) $data['logs']);
+
+        $originCenter = $this->logs[0]['center'];
+        $status = $this->logs[$this->barcode]][array_key_last($this->logs[$this->barcode])]['status'];
+        $this->setOriginCenter((string) $originCenter);                            
+        $this->setStatus((string) $status);
     }
 
     /**
