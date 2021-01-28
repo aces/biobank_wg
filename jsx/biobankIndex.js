@@ -618,20 +618,18 @@ class BiobankIndex extends React.Component {
     };
 
     const filter = (props) => (
-      <div>
-        <BiobankFilter
-          history={props.history}
-          data={this.state.data}
-          options={this.state.options}
-          increaseCoordinate={this.increaseCoordinate}
-          createPool={this.createPool}
-          createContainers={this.createContainers}
-          createSpecimens={this.createSpecimens}
-          editSpecimens={this.editSpecimens}
-          updateSpecimens={this.updateSpecimens}
-          loading={this.state.loading}
-        />
-      </div>
+      <BiobankFilter
+        history={props.history}
+        data={this.state.data}
+        options={this.state.options}
+        increaseCoordinate={this.increaseCoordinate}
+        createPool={this.createPool}
+        createContainers={this.createContainers}
+        createSpecimens={this.createSpecimens}
+        editSpecimens={this.editSpecimens}
+        updateSpecimens={this.updateSpecimens}
+        loading={this.state.loading}
+      />
     );
 
     return (
