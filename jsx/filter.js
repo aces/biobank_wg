@@ -46,9 +46,8 @@ function BiobankFilter(props) {
 
   const shipmentTab = (
     <ShipmentTab
-      data={props.data}
       options={props.options}
-      loading={props.loading}
+      data={props.data}
     />
   );
 

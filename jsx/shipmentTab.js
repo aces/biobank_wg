@@ -1,12 +1,37 @@
-import React, {useState, useReducer} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Link} from 'react-router-dom';
 
 import FilterableDataTable from 'FilterableDataTable';
-import Shipment from './Shipment';
+import {useShipment} from './Shipment';
 import TriggerableModal from 'TriggerableModal';
 
+import {get} from './helpers.js';
+
 function ShipmentTab(props) {
-  const {data, options, loading} = props;
+  // TODO: I think the shipment tab should query it's own data!!! YOLO!!!
+  // TODO: Look into Javascript "Sets" for storing Shipment objects.
+  const {data, options} = props;
+  //   const fetchData = async () => {
+  //     const result = await get(`${loris.BaseURL}/biobank/shipments/`);
+  //     setShipments(new Map(Object.entries(result)));
+  //   };
+  const [shipments, setShipments] = useState({});
+
+  // TODO: Look into this for standardization: https://www.robinwieruch.de/react-hooks-fetch-data
+  useEffect(() => {
+    const fetchData = async () => {
+      const result = await get(`${loris.BaseURL}/biobank/shipments/`);
+      setShipments(result);
+    };
+    fetchData();
+  }, []);
+
+  const createShipment = (shipment) => {
+    setShipments({
+      ...shipment.post(),
+      ...newShipments,
+    });
+  };
 
   const formatShipmentColumns = (column, value, row) => {
     switch (column) {
@@ -18,7 +43,7 @@ function ShipmentTab(props) {
     }
   };
 
-  const shipmentData = Object.values(data.shipments).map((shipment) => {
+  const shipmentData = Object.values(shipments).map((shipment) => {
     return [
       shipment.id,
       shipment.barcode,
@@ -30,9 +55,15 @@ function ShipmentTab(props) {
   });
 
   // TODO: This is temporary until a more global solution is found.
+  // TODO: The shipment tab/form should be able to get this information itself honestly.
   const centers = {};
   Object.values(options.centers).forEach((value) => {
     centers[value] = value;
+  });
+  const users = {};
+  // TODO: There has to be a better way to query this!!!
+  Object.values(options.users).forEach((user) => {
+    users[user.label] = user.label;
   });
 
   const fields = [
@@ -62,7 +93,9 @@ function ShipmentTab(props) {
   const shipmentForm = (
     <ShipmentForm
       centers={centers}
+      users={users}
       data={data}
+      createShipment={createShipment}
     />
   );
 
@@ -74,43 +107,24 @@ function ShipmentTab(props) {
       fields={fields}
       forms={forms}
       getFormattedCell={formatShipmentColumns}
-      loading={loading}
     />
   );
 }
 
 function ShipmentForm(props) {
   const logIndex = 0;
-  const reducer = (shipment, action) => {
-    const {name, value} = action;
-    return new Shipment({...shipment, [name]: value});
-  };
-  const [errors, setErrors] = useState({});
-  const [shipment, setShipment] = useReducer(reducer, new Shipment({}));
-  const setLogs = (value) => setShipment({name: 'logs', value});
-  const setLog = (name, value) => {
-    setLogs(shipment.logs.map((log, index) => {
-      if (index != logIndex) {
-        return log;
-      }
-      return {...log, [name]: value};
-    }));
-  };
-  const setContainers = (value) => setShipment({name: 'containers', value});
 
-  const createShipment = () => {
-    const errors = shipment.validate();
-    if (errors) {
-      setErrors(errors);
-    }
-    shipment.post();
-  };
+  const [shipment, setShipment] = useShipment();
+  const setLogs = (value) => setShipment('logs', value);
+  const setLog = (name, value) => setLogs(shipment.setLog(name, value, logIndex));
+  const setContainers = (value) => setShipment('containers', value);
+  const errors = {};
 
   return (
     <TriggerableModal
       label='Create Shipment'
       title='Create Shipment'
-      onSubmit={createShipment}
+      onSubmit={() => props.createShipment(shipment)}
     >
       <StaticElement
         label='Note'
@@ -119,7 +133,7 @@ function ShipmentForm(props) {
       <TextboxElement
         name='barcode'
         label='Barcode'
-        onUserInput={(name, value) => setShipment({name, value})}
+        onUserInput={setShipment}
         value={shipment.barcode}
         errorMessage={errors.barcode}
         required={true}
@@ -135,7 +149,7 @@ function ShipmentForm(props) {
       <SelectElement
         name='destinationCenter'
         label='Destination Center'
-        onUserInput={(name, value) => setShipment({name, value})}
+        onUserInput={setShipment}
         value={shipment.destinationCenter}
         options={props.centers}
         required={true}
@@ -159,6 +173,14 @@ function ShipmentForm(props) {
         label='Time'
         onUserInput={setLog}
         value={shipment.logs[logIndex].time}
+        required={true}
+      />
+      <SelectElement
+        name='user'
+        label='Done by'
+        onUserInput={setLog}
+        value={shipment.logs[logIndex].user}
+        options={props.users}
         required={true}
       />
       <InputList

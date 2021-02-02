@@ -79,9 +79,9 @@ class ShipmentController
      *
      * @param array $shipmentArray a list of shipment and container arrays to be created.
      *
-     * @return array $shipment a list of shipment objects that were created.
+     * @return Shipment $shipment a list of shipment objects that were created.
      */
-    public function createInstance(array $shipmentArray) : array
+    public function createInstance(array $shipmentArray) : Shipment
     {
         $this->validatePermission('create');
         $shipment = new Shipment($shipmentArray);

@@ -14,7 +14,6 @@ class BiobankIndex extends React.Component {
         containers: {},
         pools: {},
         specimens: {},
-        shipments: {},
       },
       loading: 0,
       options: {
@@ -30,6 +29,7 @@ class BiobankIndex extends React.Component {
         },
         diagnoses: {},
         examiners: {},
+        users: {},
         projects: {},
         sessionCenters: {},
         sessions: {},
@@ -42,7 +42,7 @@ class BiobankIndex extends React.Component {
           typeContainerTypes: {},
           protocols: {},
           protocolAttributes: {},
-          protocolContainers: {},
+          protocoContainers: {},
           processes: {},
           processAttributes: {},
           attributes: {},
@@ -76,7 +76,6 @@ class BiobankIndex extends React.Component {
     const specimens = getStream(this.props.specimenAPI, updateProgress);
     const containers = get(this.props.containerAPI);
     const pools = get(this.props.poolAPI);
-    const shipments = get(this.props.shipmentsAPI);
     const options = await get(this.props.optionsAPI, updateProgress);
     this.setState({options});
 
@@ -84,7 +83,6 @@ class BiobankIndex extends React.Component {
     data.containers = await containers;
     data.specimens = await specimens;
     data.pools = await pools;
-    data.shipments = await shipments;
     this.setState({data});
   }
 
@@ -652,7 +650,6 @@ window.addEventListener('load', () => {
       specimenAPI={`${biobank}specimenendpoint/`}
       containerAPI={`${biobank}containerendpoint/`}
       poolAPI={`${biobank}poolendpoint/`}
-      shipmentsAPI={`${biobank}shipments/`}
       optionsAPI={`${biobank}optionsendpoint/`}
       labelAPI={`${biobank}labelendpoint/`}
     />,

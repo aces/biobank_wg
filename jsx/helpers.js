@@ -67,11 +67,16 @@ export async function getStream(url, setProgress) {
   return JSON.parse(chunks);
 }
 
-export async function get(url) {
+export async function get(url, callBack) {
   const response = await fetch(url, {credientials: 'same-origin', method: 'GET'})
   .catch((error, errorCode, errorMsg) => console.error(error, errorCode, errorMsg));
 
-  return response.json();
+  const values = response.json();
+  if (callBack) {
+    callBack(values);
+  }
+
+  return values;
 }
 
 // function parsePartialJson(str) {

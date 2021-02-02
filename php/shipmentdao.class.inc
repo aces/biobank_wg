@@ -68,9 +68,9 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      *
      * @return Shipment $shipment Shipment Instance.
      */
-    public function getInstanceFromBarcode(int $barcode) : Shipment
+    public function getInstanceFromBarcode(string $barcode) : Shipment
     {
-        return $this->selectInstances([['column'=>'Barcode', 'value'=>$barcode]])[$barcode];
+        return $this->selectInstances([['column'=>'s.Barcode', 'value'=>$barcode]])[$barcode];
     }
 
     /**
@@ -175,14 +175,30 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     public function saveInstance(Shipment $shipment) : Shipment
     {
-        // Converts Shipment Object into SQL format.
+        // Converts Shipment Object into SQL format and inserts into database.
         $shipmentSQL = $this->getSQLFromInstance($shipment);
-
-        // Inserts or Updates the shipment with respective data.
         $this->db->insertOnDuplicateUpdate(
             'shipment',
             $shipmentSQL
         );
+
+        $shipmentId = $shipment->getId() ?? $this->db->getLastInsertID();
+
+        foreach($shipment->getLogs() as $log) {
+            $logSQL = $this->getLogSQLFromInstance($log, $shipmentId);
+            $this->db->insertOnDuplicateUpdate(
+                'shipment_log',
+                $logSQL
+            );
+        }
+
+        foreach($shipment->getContainers() as $barcode) {
+            $containerSQL = $this->getContainerSQLFromInstance($barcode, $shipmentId);
+            $this->db->insertOnDuplicateUpdate(
+                'biobank_container_shipment_rel',
+                $containerSQL
+            );
+        }
 
         return $this->getInstanceFromBarcode($shipment->getBarcode());
     }
@@ -199,14 +215,56 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     private function getSQLFromInstance(Shipment $shipment) : array
     {
-        print_r($shipment->getDestinationCenter());
-        $destinationCenterID = $this->db->pselectOne(
-          'SELECT CenterID FROM psc WHERE Name=:name', ['name'=>$shipment->getDestinationCenter()]
+        // TODO: These queries feel clumsy. There is likely a better way to get
+        // the ID.
+        $destinationCenterId = $this->db->pselectOne(
+            'SELECT CenterID FROM psc WHERE Name=:n', ['n' =>$shipment->getDestinationCenter()]
         );
+
         return [
                 'ShipmentID'          => $shipment->getId(),
                 'Barcode'             => $shipment->getBarcode(),
-                'DestinationCenterID' => $destinationCenterID,
+                'DestinationCenterID' => $destinationCenterId,
+               ];
+    }
+
+    // TODO: LOG SHOULD BECOME IT'S OWN ENTITY
+    private function getLogSQLFromInstance(array $log, string $shipmentId) : array
+    {
+        // TODO: These queries feel clumsy. There is likely a better way to get
+        // the ID.
+        $centerId = $this->db->pselectOne(
+            'SELECT CenterID FROM psc WHERE Name=:n', ['n' => $log['center']]
+        );
+        $statusId = $this->db->pselectOne(
+            'SELECT StatusID from shipment_status WHERE Label=:l', ['l' => $log['status']]
+        );
+        $userId = $this->db->pselectOne(
+            'SELECT ID FROM users WHERE UserID=:u', ['u' => $log['user']]
+        );
+
+        return [
+                'ShipmentID'  => $shipmentId,
+                'CenterID'    => $centerId,
+                'StatusID'    => $statusId,
+                'Temperature' => $log['temperature'],
+                'Date'        => $log['date'],
+                'Time'        => $log['time'],
+                'UserID'      => $userId,
+               ];
+    }
+
+    private function getContainerSQLFromInstance(string $barcode, string $shipmentId) : array
+    {
+        // TODO: This should maybe make use of the container object to get the ID
+        // instead of resorting to a query.
+        $containerId = $this->db->pselectOne(
+            'SELECT ContainerID FROM biobank_container WHERE Barcode=:b', ['b' => $barcode]
+        );
+
+        return [
+                'ShipmentID' => $shipmentId,
+                'ContainerID' => $containerId,
                ];
     }
 }

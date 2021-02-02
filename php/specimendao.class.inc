@@ -577,6 +577,19 @@ class SpecimenDAO extends \LORIS\Data\ProvisionerInstance
         return $this->getInstanceFromId($specimen->getId());
     }
 
+    private function deleteInstance() {
+      "SELECT ContainerID FROM biobank_container WHERE Barcode=";
+      "SELECT SpecimenID FROM biobank_specimen WHERE ContainerID=";
+      "DELETE FROM biobank_specimen_analysis WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen_preparation WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen_collection WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen_parent WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen WHERE SpecimenID=";
+
+      "DELETE FROM biobank_container_parent WHERE ContainerID=";
+      "DELETE FROM biobank_container WHERE ContainerID=";
+    }
+
     /**
      * This function takes a Specimen Instance and prepares the data to be
      * inserted into the database by converting it to a data array. This one to
