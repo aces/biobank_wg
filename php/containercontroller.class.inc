@@ -212,7 +212,7 @@ class ContainerController
         $this->validateTemperature($container);
         $this->validateStatusId($container);
         $this->validateProjectIds($container);
-        $this->validateCenterId($container);
+        $this->validateCenter($container);
         $this->validateParentContainerId($container);
         $this->validateCoordinate($container);
         $this->validateLotNumber($container);
@@ -414,7 +414,7 @@ class ContainerController
     }
 
     /**
-     * Validates Container Object Center ID.
+     * Validates Container Object Center.
      *
      * @param Container $container Container to be checked.
      *
@@ -422,16 +422,16 @@ class ContainerController
      *
      * @return void
      */
-    private function validateCenterId(Container $container) : void
+    private function validateCenter(Container $container) : void
     {
-        if (is_null($container->getCenterId())) {
+        if (is_null($container->getCenter())) {
             throw new \BadRequest("Center value must be set.");
         }
 
         $parentContainerId = $container->getParentContainerId();
         if (false) {
             $parentContainer = $this->dao->getInstanceFromId($parentContainerId);
-            if ($container->getCenterID() !== $parentContainer->getCenterID()) {
+            if ($container->getCenter() !== $parentContainer->getCenter()) {
                 $barcode = $container->getBarcode();
                 throw new \BadRequest(
                         $container->getBarcode()." must be at the same location 

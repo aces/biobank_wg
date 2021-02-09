@@ -8,8 +8,6 @@ import TriggerableModal from 'TriggerableModal';
 import {get} from './helpers.js';
 
 function ShipmentTab(props) {
-  // TODO: I think the shipment tab should query it's own data!!! YOLO!!!
-  // TODO: Look into Javascript "Sets" for storing Shipment objects.
   const {data, options} = props;
   //   const fetchData = async () => {
   //     const result = await get(`${loris.BaseURL}/biobank/shipments/`);
@@ -26,10 +24,10 @@ function ShipmentTab(props) {
     fetchData();
   }, []);
 
-  const createShipment = (shipment) => {
+  const updateShipments = async (shipment) => {
     setShipments({
-      ...shipment.post(),
-      ...newShipments,
+      ...shipments,
+      [shipment.barcode]: shipment,
     });
   };
 
@@ -90,16 +88,14 @@ function ShipmentTab(props) {
     {label: 'Containers', show: true},
   ];
 
-  const shipmentForm = (
+  const forms = [
     <ShipmentForm
       centers={centers}
       users={users}
       data={data}
-      createShipment={createShipment}
-    />
-  );
-
-  const forms = [shipmentForm];
+      updateShipments={updateShipments}
+    />,
+  ];
 
   return (
     <FilterableDataTable
@@ -113,18 +109,17 @@ function ShipmentTab(props) {
 
 function ShipmentForm(props) {
   const logIndex = 0;
-
-  const [shipment, setShipment] = useShipment();
-  const setLogs = (value) => setShipment('logs', value);
-  const setLog = (name, value) => setLogs(shipment.setLog(name, value, logIndex));
-  const setContainers = (value) => setShipment('containers', value);
-  const errors = {};
+  const handler = new useShipment();
+  const shipment = handler.getShipment();
+  const errors = handler.getErrors();
+  const onSubmit = async () => props.updateShipments(await handler.post());
 
   return (
     <TriggerableModal
       label='Create Shipment'
       title='Create Shipment'
-      onSubmit={() => props.createShipment(shipment)}
+      onSubmit={onSubmit}
+      onClose={handler.clear}
     >
       <StaticElement
         label='Note'
@@ -133,64 +128,73 @@ function ShipmentForm(props) {
       <TextboxElement
         name='barcode'
         label='Barcode'
-        onUserInput={setShipment}
+        onUserInput={handler.set}
         value={shipment.barcode}
         errorMessage={errors.barcode}
-        required={true}
-      />
-      <SelectElement
-        name='center'
-        label='Origin Center'
-        onUserInput={setLog}
-        value={shipment.logs[logIndex].center}
-        options={props.centers}
-        required={true}
-      />
-      <SelectElement
-        name='destinationCenter'
-        label='Destination Center'
-        onUserInput={setShipment}
-        value={shipment.destinationCenter}
-        options={props.centers}
-        required={true}
-      />
-      <TextboxElement
-        name='temperature'
-        label='Temperature'
-        onUserInput={setLog}
-        value={shipment.logs[logIndex].temperature}
-        required={true}
-      />
-      <DateElement
-        name='date'
-        label='Date'
-        onUserInput={setLog}
-        value={shipment.logs[logIndex].date}
-        required={true}
-      />
-      <TimeElement
-        name='time'
-        label='Time'
-        onUserInput={setLog}
-        value={shipment.logs[logIndex].time}
-        required={true}
-      />
-      <SelectElement
-        name='user'
-        label='Done by'
-        onUserInput={setLog}
-        value={shipment.logs[logIndex].user}
-        options={props.users}
         required={true}
       />
       <InputList
         name='barcode'
         label="Container"
         items={shipment.containers}
-        setItems={setContainers}
+        setItems={handler.setContainers}
         options={props.data.containers}
+        errorMessage={errors.containers}
+      />
+      <SelectElement
+        name='destinationCenter'
+        label='Destination Center'
+        onUserInput={handler.set}
+        value={shipment.destinationCenter}
+        options={props.centers}
+        errorMessage={errors.destinationCenter}
+        required={true}
+      />
+      <LogForm
+        log={shipment.logs[logIndex]}
+        setLog={(name, value) => handler.setLog(name, value, logIndex)}
+        errors={errors.logs[logIndex] || {}}
+        {...props}
       />
     </TriggerableModal>
+  );
+}
+
+function LogForm(props) {
+  const {log, setLog, errors} = props;
+  return (
+    <>
+      <TextboxElement
+        name='temperature'
+        label='Temperature'
+        onUserInput={setLog}
+        value={log.temperature}
+        required={true}
+      />
+      <DateElement
+        name='date'
+        label='Date'
+        onUserInput={setLog}
+        value={log.date}
+        required={true}
+      />
+      <TimeElement
+        name='time'
+        label='Time'
+        onUserInput={setLog}
+        value={log.time}
+        required={true}
+      />
+      <SelectElement
+        name='user'
+        label='Done by'
+        onUserInput={setLog}
+        value={log.user}
+        options={props.users}
+        errorMessage={errors.user}
+        required={true}
+      />
+    </>
   );
 }
 

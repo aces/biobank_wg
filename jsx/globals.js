@@ -234,32 +234,10 @@ function Globals(props) {
     </InlineField>
   );
 
-  const editSite = () => props.edit('center');
   const centerField = (
     <InlineField
-      loading={props.loading}
-      label='Current Site'
-      clearAll={props.clearAll}
-      updateValue={updateContainer}
-      edit={!container.parentContainerId && editSite}
-      editValue={editContainer}
-      value={options.centers[container.centerId]}
-      editable={editable.center}
-    >
-      <SelectElement
-        name='centerId'
-        options={props.options.centers}
-        onUserInput={props.setContainer}
-        value={props.current.container.centerId}
-        errorMessage={props.errors.container.centerId}
-      />
-    </InlineField>
-  );
-
-  const originField = (
-    <InlineField
-      label='Origin Site'
-      value={options.centers[container.originId]}
+      label='Site'
+      value={container.center}
     />
   );
 
@@ -384,7 +362,6 @@ function Globals(props) {
         {statusField}
         {projectField}
         {centerField}
-        {originField}
         {parentSpecimenField()}
         {parentContainerField()}
         {candidateSessionField}

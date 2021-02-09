@@ -75,6 +75,17 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
         return $this->selectInstances([['column'=>'bc.ContainerID', 'value'=>$id]])[$id];
     }
 
+    // TODO: Fix this onece containers are indexed by barcode and not ID
+    public function getInstanceFromBarcode(string $barcode) : Container
+    {
+        $containers = $this->selectInstances([['column'=>'bc.Barcode', 'value'=>$barcode]]);
+        $result = '';
+        foreach($containers as $container) {
+            $result = $container;
+        }
+        return $result;
+    }
+
     /**
      * Returns an array of all the Child Container IDs associated with
      * the given Container ID from the biobank_container_parent table.
@@ -136,8 +147,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                      bc.ContainerStatusID,
                      GROUP_CONCAT(DISTINCT(bcpr.ProjectID)) as ProjectIDs,
                      bc.Temperature,
-                     bc.OriginCenterID,
-                     bc.CurrentCenterID,
+                     psc.Name as Center,
                      bcp.ParentContainerID,
                      GROUP_CONCAT(DISTINCT(bcp2.ContainerID)) as ChildContainerIDs,
                      bcp.Coordinate as Coordinate,
@@ -156,7 +166,9 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                   LEFT JOIN biobank_container_project_rel bcpr
                     ON bc.ContainerID=bcpr.ContainerID
                   LEFT JOIN biobank_specimen bs
-                    ON bc.ContainerID=bs.ContainerID';
+                    ON bc.ContainerID=bs.ContainerID
+                  LEFT JOIN psc 
+                    ON bc.CenterID=psc.CenterID';
         if (!empty($conditions)) {
             $whereClause = [];
             foreach($conditions as $condition) {
@@ -551,8 +563,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                            'ContainerTypeID'   => $container->getTypeId(),
                            'Temperature'       => $container->getTemperature(),
                            'ContainerStatusID' => $container->getStatusId(),
-                           'OriginCenterID'    => $container->getOriginId(),
-                           'CurrentCenterID'   => $container->getCenterId(),
+                           'CenterID'          => $container->getCenter(),
                            'LotNumber'         => $container->getLotNumber(),
                            'ExpirationDate'    => $expirationDate,
                            'Comments'           => $container->getComments(),
@@ -598,8 +609,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
         isset($data['Temperature'])          && $container->setTemperature((float) $data['Temperature']);
         isset($data['ContainerStatusID'])    && $container->setStatusId((int) $data['ContainerStatusID']);
         isset($projectIds)                   && $container->setProjectIds($projectIds);
-        isset($data['OriginCenterID'])       && $container->setOriginId((int) $data['OriginCenterID']);
-        isset($data['CurrentCenterID'])      && $container->setCenterId((int) $data['CurrentCenterID']);
+        $container->setCenter($data['Center']);
         isset($data['ParentContainerID'])    && $container->setParentContainerId((int) $data['ParentContainerID']);
         isset($childContainerIds)            && $container->setChildContainerIds($childContainerIds);
         isset($data['Coordinate'])           && $container->setCoordinate((int) $data['Coordinate']);

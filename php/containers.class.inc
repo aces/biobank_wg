@@ -28,7 +28,7 @@ use \Psr\Http\Message\ResponseInterface;
  * @license    http://www.gnu.org/licenses/gpl-3.0.text GPLv3
  * @link       http://www.github.com/aces/Loris/
  */
-class ContainerEndpoint implements RequestHandlerInterface
+class Containers implements RequestHandlerInterface
 {
     /**
      * Returns true if user has access to this endpoint.
@@ -87,12 +87,20 @@ class ContainerEndpoint implements RequestHandlerInterface
         $db       = \Database::singleton();
         $user     = $request->getAttribute('user');
         $contCont = new ContainerController($db, $user);
+        $contDao = new ContainerDAO($db);
+        // $barcode = basename($request->getUri()->getPath());
+        // $pathparts = $request->getAttribute('pathparts');
+        $barcode = basename($request->getRequestTarget());
 
         try {
             $db->beginTransaction();
             switch($request->getMethod()) {
             case 'GET':
-                $containers = $contCont->getInstances();
+                if ($barcode != 'containers') {
+                    $containers = [$contDao->getInstanceFromBarcode($barcode)];
+                } else {
+                    $containers = $contCont->getInstances();
+                }
                 return new \LORIS\Http\Response\OK($containers);
             case 'POST':
                 $containers = json_decode($request->getBody()->getContents(), true);

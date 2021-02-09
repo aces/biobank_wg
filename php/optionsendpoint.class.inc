@@ -113,7 +113,7 @@ class OptionsEndpoint implements RequestHandlerInterface
     {
         $contCont = new ContainerController($db, $user);
         $specCont = new SpecimenController($db, $user);
-        $shipCont = new ShipmentController($db, $user);
+        $shipDAO = new ShipmentDAO($db);
 
         // XXX: This should eventually be replaced by a call directly to a
         // Candidate endpoint or Candidate controller that will be able to
@@ -185,6 +185,7 @@ class OptionsEndpoint implements RequestHandlerInterface
             }
         }
 
+        $statuses = ['statuses' => $shipDAO->getStatuses()];
         return array(
                 'candidates'        => $candidates,
                 'diagnoses'         => $diagnoses,
@@ -197,7 +198,7 @@ class OptionsEndpoint implements RequestHandlerInterface
                 'sessionCenters'    => $sessionCenters,
                 'container'         => $contCont->getOptions(),
                 'specimen'          => $specCont->getOptions(),
-                'shipment'          => $shipCont->getOptions(),
+                'shipment'          => $statuses,
                );
     }
 }

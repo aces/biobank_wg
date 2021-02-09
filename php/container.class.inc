@@ -45,8 +45,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
      * @var float     $temperature
      * @var int       $statusId
      * @var array     $projectIds
-     * @var int       $originId
-     * @var int       $centerId
+     * @var int       $center
      * @var int       $parentContainerId
      * @var array     $childContainerIds
      * @var int       $coordinate
@@ -64,8 +63,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
     private $temperature;
     private $statusId;
     private $projectIds;
-    private $originId;
-    private $centerId;
+    private $center;
     private $parentContainerId;
     private $childContainerIds;
     private $coordinate;
@@ -267,51 +265,25 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
     }
 
     /**
-     * Sets the ID of the container's origin
+     * Sets the container's current center
      *
-     * @param int $originId the ID of the container's origin
-     *
-     * @return void
-     */
-    public function setOriginId(int $originId) : void
-    {
-        if ($originId > 0) {
-            $this->originId = $originId;
-        }
-    }
-
-    /**
-     * Gets the ID of the container's origin
-     *
-     * @return ?int
-     */
-    public function getOriginId() : ?int
-    {
-        return $this->originId;
-    }
-
-    /**
-     * Sets the ID of the container's current centerId
-     *
-     * @param int $centerId the ID of the container's current centerId
+     * @param int $center the ID of the container's current center
      *
      * @return none
      */
-    public function setCenterId(int $centerId) : void
+    public function setCenter(string $center) : void
     {
-        if ($centerId > 0) {
-            $this->centerId = $centerId;
-        }
+        $this->center = $center;
     }
 
     /**
-     * Gets the ID of the container's current centerId
+     * Gets the container's current center
      *
-     * @return ?int
+     * @return ?string
      */
-    public function getCenterId() : ?int
+    public function getCenter() : ?string
     {
-        return $this->centerId;
+        return $this->center;
     }
 
     /**
@@ -467,8 +439,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
         isset($data['temperature'])       && $this->setTemperature((float) ($data['temperature']));
         isset($data['statusId'])          && $this->setStatusId((int) $data['statusId']);
         isset($data['projectIds'])        && $this->setProjectIds($data['projectIds']);
-        isset($data['originId'])          && $this->setOriginId((int) $data['originId']);
-        isset($data['centerId'])          && $this->setCenterId((int) $data['centerId']);
+        isset($data['center'])            && $this->setCenter((int) $data['center']);
         isset($data['parentContainerId']) && $this->setParentContainerId((int) $data['parentContainerId']);
         isset($data['childContainerIds']) && $this->setChildContainerIds($data['childContainerIds']);
         isset($data['coordinate'])        && $this->setCoordinate((int) $data['coordinate']);
@@ -511,8 +482,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
                 'temperature'       => $this->temperature,
                 'statusId'          => $this->statusId,
                 'projectIds'        => $this->projectIds,
-                'originId'          => $this->originId,
-                'centerId'          => $this->centerId,
+                'center'            => $this->center,
                 'parentContainerId' => $this->parentContainerId,
                 'childContainerIds' => $this->childContainerIds,
                 'coordinate'        => $this->coordinate,

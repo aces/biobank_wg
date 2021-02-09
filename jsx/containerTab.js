@@ -35,8 +35,6 @@ class ContainerTab extends Component {
         return this.props.options.container.stati[value].label;
       case 'Projects':
         return value.map((id) => this.props.options.projects[id]);
-      case 'Site':
-        return this.props.options.centers[value];
       case 'Parent Barcode':
         return (value && this.props.data.containers[value].barcode);
       default:
@@ -106,7 +104,7 @@ class ContainerTab extends Component {
           container.typeId,
           container.statusId,
           container.projectIds,
-          container.centerId,
+          container.center,
           container.parentContainerId,
         ];
       }
@@ -129,7 +127,7 @@ class ContainerTab extends Component {
       }},
       {label: 'Projects', show: true},
       {label: 'Site', show: true, filter: {
-        name: 'currentSite',
+        name: 'site',
         type: 'select',
         options: this.props.options.centers,
       }},

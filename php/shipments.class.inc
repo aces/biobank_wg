@@ -84,24 +84,49 @@ class Shipments implements RequestHandlerInterface
      */
     public function handle(ServerRequestInterface $request) : ResponseInterface
     {
-        $db       = \Database::singleton();
-        $user     = $request->getAttribute('user');
-        $shipCont = new ShipmentController($db, $user);
+        $this->db       = \Database::singleton();
+        $this->user     = $request->getAttribute('user');
 
         $pathparts = $request->getAttribute('pathparts');
 
         switch($request->getMethod()) {
         case 'GET':
-            $shipments = $shipCont->getInstances();
-            return new \LORIS\Http\Response\OK($shipments);
+            return $this->_handleGET($request);
         case 'POST':
-            $shipment = json_decode($request->getBody()->getContents(), true);
-            $shipments = $shipCont->createInstance($shipment);
-            return new \LORIS\Http\Response\OK([$shipments]);
+            return $this->_handlePOST($request);
         case 'PUT':
         case 'OPTIONS':
             return (new \LORIS\Http\Response())
                 ->withHeader('Allow', $this->allowedMethods());
         }
+    }
+
+    private function _handleGET(ServerRequestInterface $request) : ResponseInterface
+    {
+        // TODO: This needs to be checked but should probably go somewhere else...
+        // if (!$this->user->hasPermission('biobank_shipment_view')) {
+        //     throw new \Forbidden('Shipment: View Permission Denied');
+        // }
+        $shipments = [];
+        $dao = new ShipmentDAO($this->db);
+        if ($this->user->hasPermission('access_all_profiles') === false) {
+            $dao = $dao->filter(new \LORIS\Data\Filters\UserSiteMatch());
+        }
+        $shipmentIterator = $dao->execute($this->user);
+        foreach ($shipmentIterator as $barcode=>$shipment) {
+            $shipments[$barcode] = $shipment;
+        }
+        return new \LORIS\Http\Response\OK($shipments);
+    }
+
+    private function _handlePOST(ServerRequestInterface $request) : ResponseInterface
+    {
+        $shipmentArray   = json_decode($request->getBody()->getContents(), true);
+        $shipmentHandler = new ShipmentHandler(new Shipment($shipmentArray), $this->db, $this->user);
+        if (!$shipmentHandler->isValid()) {
+            return new \LORIS\Http\Response\JsonResponse($shipmentHandler->getErrors(), 422);
+        }
+        
+        return new \LORIS\Http\Response\JsonResponse($shipmentHandler->createInstance(), 200);
     }
 }

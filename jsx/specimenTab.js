@@ -46,10 +46,6 @@ class SpecimenTab extends Component {
         return value.map((id) => options.diagnoses[id].label);
       case 'Status':
         return options.container.stati[value].label;
-      case 'Current Site':
-        return options.centers[value];
-      case 'Origin Site':
-        return options.centers[value];
       case 'Projects':
         return value.map((id) => options.projects[id]);
       default:
@@ -148,8 +144,7 @@ class SpecimenTab extends Component {
         specimen.poolId ? (data.pools[specimen.poolId]||{}).label : null,
         container.statusId,
         container.projectIds,
-        container.centerId,
-        container.originId,
+        container.center,
         specimen.collection.date,
         specimen.collection.time,
         (specimen.preparation||{}).time,
@@ -232,13 +227,8 @@ class SpecimenTab extends Component {
         type: 'multiselect',
         options: options.projects,
       }},
-      {label: 'Current Site', show: true, filter: {
-        name: 'currentSite',
-        type: 'select',
-        options: options.centers,
-      }},
-      {label: 'Origin Site', show: true, filter: {
-        name: 'originSite',
+      {label: 'Site', show: true, filter: {
+        name: 'site',
         type: 'select',
         options: options.centers,
       }},

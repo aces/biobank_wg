@@ -103,6 +103,7 @@ CREATE TABLE `biobank_container_status` (
   CONSTRAINT `UK_biobank_container_status_Label` UNIQUE (`Label`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+/*TODO: Remove OriginCENTERID and rename CurrentCenterID to CenterID*/
 CREATE TABLE `biobank_container` (
   `ContainerID` integer unsigned NOT NULL AUTO_INCREMENT,
   `Barcode` varchar(40) NOT NULL, /*index by barcode*/

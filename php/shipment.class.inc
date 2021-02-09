@@ -223,6 +223,16 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     {
         return $this->logs;
     }
+
+    public function setErrors(array $errors) : void
+    {
+        $this->errors = $errors;
+    }
+
+    public function getErrors()
+    {
+        return $this->errors;
+    }
                                                                                 
     /**                                                                         
      * A wrapper function for the jsonSerialize method of the Shipment Instance 
