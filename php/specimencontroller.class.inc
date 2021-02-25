@@ -155,12 +155,10 @@ class SpecimenController
                 'protocols'          => $this->dao->getProtocols(),
                 'processes'          => $this->dao->getProcesses(),
                 'protocolAttributes' => $this->dao->getProtocolAttributes(),
-                'protocolContainers' => $this->dao->getProtocolContainers(),
                 'processAttributes'  => $this->dao->getProcessAttributes(),
                 'units'              => $this->dao->getUnits(),
                 'attributes'         => $this->dao->getAttributes(),
                 'attributeDatatypes' => $this->dao->getAttributeDatatypes(),
-                'attributeOptions'   => $this->dao->getAttributeReferenceTableOptions(),
                );
     }
 

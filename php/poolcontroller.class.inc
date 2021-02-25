@@ -153,7 +153,7 @@ class PoolController
      */
     private function validateLabel(Pool $pool) : void
     {
-        $poolList = $this->dao->selectInstances(['bp.Label' => $pool->getLabel()]);
+        $poolList = $this->dao->selectInstances([['column' => 'bp.Label', 'value' => $pool->getLabel()]]);
         if (!empty($poolList)) {
             throw new \BadRequest('Pool Label must be unique');
         }

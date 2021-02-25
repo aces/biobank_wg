@@ -3,22 +3,18 @@
 /*Relational*/
 DROP TABLE IF EXISTS `biobank_container_parent`;
 DROP TABLE IF EXISTS `biobank_container_project_rel`;
-DROP TABLE IF EXISTS `biobank_container_psc_rel`;
 DROP TABLE IF EXISTS `biobank_specimen_pool_rel`;
 DROP TABLE IF EXISTS `biobank_specimen_type_parent`;
 DROP TABLE IF EXISTS `biobank_specimen_parent`;
 DROP TABLE IF EXISTS `biobank_specimen_type_unit_rel`;
-DROP TABLE IF EXISTS `biobank_specimen_protocol_container_type_rel`;
 DROP TABLE IF EXISTS `biobank_specimen_type_container_type_rel`;
 DROP TABLE IF EXISTS `biobank_specimen_protocol_attribute_rel`;
-DROP TABLE IF EXISTS `biobank_specimen_type_attribute_rel`;
 
 /*Pool*/
 DROP TABLE IF EXISTS `biobank_pool`;
 
 /*Specimen*/
 DROP TABLE IF EXISTS `biobank_specimen_attribute`;
-DROP TABLE IF EXISTS `biobank_specimen_attribute_referencetable`;
 DROP TABLE IF EXISTS `biobank_specimen_attribute_datatype`;
 DROP TABLE IF EXISTS `biobank_specimen_analysis`;
 DROP TABLE IF EXISTS `biobank_specimen_preparation`;
@@ -280,26 +276,13 @@ CREATE TABLE `biobank_specimen_attribute_datatype` (
   CONSTRAINT `PK_biobank_datatype` PRIMARY KEY (`DatatypeID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `biobank_specimen_attribute_referencetable` (
-  `ReferenceTableID` integer unsigned NOT NULL AUTO_INCREMENT,
-  `TableName` varchar(50) NOT NULL,
-  `ColumnName` varchar(50) NOT NULL,
-  CONSTRAINT `PK_biobank_specimen_attribute_referencetable` PRIMARY KEY (`ReferenceTableID`),
-  CONSTRAINT `UK_bio_spec_attribute_referencetable_TableName_ColumnName` UNIQUE(`TableName`, `ColumnName`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
 CREATE TABLE `biobank_specimen_attribute` (
   `SpecimenAttributeID` integer unsigned NOT NULL AUTO_INCREMENT,
   `Label` varchar(40) NOT NULL,
   `DatatypeID` integer unsigned NOT NULL,
-  `ReferenceTableID` integer unsigned,
   CONSTRAINT `PK_biobank_specimen_attribute` PRIMARY KEY (`SpecimenAttributeID`),
   CONSTRAINT `FK_biobank_specimen_attribute_DatatypeID`
     FOREIGN KEY (`DatatypeID`) REFERENCES `biobank_specimen_attribute_datatype`(`DatatypeID`)
-    ON UPDATE RESTRICT ON DELETE RESTRICT,
-  CONSTRAINT `FK_biobank_specimen_attribute_ReferenceTableID` 
-    FOREIGN KEY (`ReferenceTableID`) REFERENCES `biobank_specimen_attribute_referencetable`(`ReferenceTableID`)
     ON UPDATE RESTRICT ON DELETE RESTRICT,
   CONSTRAINT `UK_biobank_specimen_attribute_Label` UNIQUE (`Label`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -338,18 +321,6 @@ CREATE TABLE `biobank_specimen_protocol_attribute_rel` (
     ON UPDATE RESTRICT ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `biobank_specimen_protocol_container_type_rel` (
-  `SpecimenProtocolID` integer unsigned NOT NULL,
-  `ContainerTypeID` integer unsigned NOT NULL,
-  CONSTRAINT `PK_biobank_specimen_protocol_container_type_rel` PRIMARY KEY (SpecimenProtocolID, ContainerTypeID),
-  CONSTRAINT `FK_bio_spec_protocol_container_type_rel_SpecimenProtocolID` 
-    FOREIGN KEY (`SpecimenProtocolID`) REFERENCES `biobank_specimen_protocol`(`SpecimenProtocolID`)
-    ON UPDATE RESTRICT ON DELETE RESTRICT,
-  CONSTRAINT `FK_biobank_specimen_protocol_container_type_rel_ContainerTypeID` 
-    FOREIGN KEY (`ContainerTypeID`) REFERENCES `biobank_container_type`(`ContainerTypeID`)
-    ON UPDATE RESTRICT ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 CREATE TABLE `biobank_specimen_type_container_type_rel` (
   `SpecimenTypeID` integer unsigned NOT NULL,
   `ContainerTypeID` integer unsigned NOT NULL,
@@ -365,7 +336,7 @@ CREATE TABLE `biobank_specimen_type_container_type_rel` (
 CREATE TABLE `biobank_specimen_type_unit_rel` (
   `SpecimenTypeID` integer unsigned NOT NULL, 
   `UnitID` integer unsigned  NOT NULL,
-  CONSTRAINT `PK_biobank_container_psc_rel` PRIMARY KEY (`SpecimenTypeID`, `UnitID`),
+  CONSTRAINT `PK_biobank_container_type_unit_rel_SpecimenTypeID_UnitID` PRIMARY KEY (`SpecimenTypeID`, `UnitID`),
   CONSTRAINT `FK_biobank_specimen_type_unit_rel_TypeID`
     FOREIGN KEY (`SpecimenTypeID`) REFERENCES `biobank_specimen_type` (`SpecimenTypeID`)
     ON UPDATE RESTRICT ON DELETE RESTRICT,

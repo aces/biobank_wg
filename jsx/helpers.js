@@ -26,13 +26,11 @@ export function isEmpty(object) {
 }
 
 export function padBarcode(pscid, increment) {
-  let padding = '';
-  if (increment/10 < 1) {
-    padding ='00';
-  } else if (1 <= increment/10 < 10) {
-    padding = '0';
-  }
-  return pscid+padding+increment;
+  return pscid+padLeft(increment, 3);
+}
+
+function padLeft(nr, n, str) {
+    return Array(n-String(nr).length+1).join(str||'0')+nr;
 }
 
 export async function getStream(url, setProgress) {
