@@ -122,7 +122,7 @@ class Shipments implements RequestHandlerInterface
     private function _handlePOST(ServerRequestInterface $request) : ResponseInterface
     {
         $shipmentArray   = json_decode($request->getBody()->getContents(), true);
-        $shipmentHandler = new ShipmentHandler(new Shipment($shipmentArray), $this->db, $this->user);
+        $shipmentHandler = new ShipmentHandler($shipmentArray, $this->db, $this->user);
         if (!$shipmentHandler->isValid()) {
             return new \LORIS\Http\Response\JsonResponse($shipmentHandler->getErrors(), 422);
         }

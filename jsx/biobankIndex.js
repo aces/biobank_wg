@@ -24,7 +24,6 @@ class BiobankIndex extends React.Component {
           types: {},
           typesPrimary: {},
           typesNonPrimary: {},
-          dimensions: {},
           stati: {},
         },
         diagnoses: {},
@@ -595,6 +594,7 @@ class BiobankIndex extends React.Component {
   render() {
     const barcode = (props) => {
       const target = this.routeBarcode(props.match.params.barcode);
+      console.log(target);
       return (
         <BarcodePage
           history={props.history}

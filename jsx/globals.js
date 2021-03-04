@@ -1,9 +1,12 @@
-import React from 'react';
-import PropTypes from 'prop-types';
+import React, {useState} from 'react';
 import {Link} from 'react-router-dom';
 import {mapFormOptions} from './helpers.js';
 
-import Modal from 'Modal';
+import {useContainer} from './Container.js';
+import {useSpecimen} from './Specimen.js';
+import {ActionButton} from './barcodePage';
+
+import TriggerableModal from 'TriggerableModal';
 import Loader from 'Loader';
 import ContainerParentForm from './containerParentForm';
 
@@ -14,235 +17,153 @@ import ContainerParentForm from './containerParentForm';
  * @return {*}
  **/
 function Globals(props) {
-  const {current, data, editable, options, specimen, container} = props;
-  const updateContainer = () => props.updateContainer(current.container);
-  const editContainer = () => props.editContainer(container);
+  const {current, data, options} = props;
 
-  const specimenTypeField = specimen && (
-    <InlineField
+  const contHand = new useContainer(props.container);
+  const container = contHand.getContainer();
+  const cErrors = contHand.getErrors();
+
+  const specHand = new useSpecimen(props.specimen);
+  const specimen = specHand.getSpecimen();
+  const sErrors = specHand.getErrors();
+
+  const specimenTypeField = specimen.typeId && (
+    <InlineForm
       label='Specimen Type'
       value={options.specimen.types[specimen.typeId].label}
     />
   );
 
-  const edit = loris.userHasPermission('biobank_specimen_alter') && specimen && (
-    () => {
-      props.edit('containerType');
-      editContainer();
-    }
-  );
+  const updateContainerType = loris.userHasPermission('biobank_specimen_alter') && specimen.id && contHand.put;
   const containerTypes = mapFormOptions(options.container.typesPrimary, 'label');
   const containerTypeField = (
-    <InlineField
-      loading={props.loading}
+    <InlineForm
       label={'Container Type'}
-      updateValue={updateContainer}
-      clearAll={props.clearAll}
+      updateValue={updateContainerType}
       pencil={true}
       value={options.container.types[container.typeId].label}
-      edit={edit}
-      editable={editable.containerType}
     >
       <SelectElement
         name='typeId'
-        onUserInput={props.setContainer}
+        onUserInput={contHand.set}
         options={containerTypes}
-        value={current.container.typeId}
-        errorMessage={props.errors.container.typeId}
+        value={container.typeId}
+        errorMessage={cErrors.typeId}
       />
-    </InlineField>
+    </InlineForm>
   );
 
-  const poolField = (specimen||{}).poolId ? (
-    <InlineField
+  const poolField = specimen.poolId && (
+    <InlineForm
       label='Pool'
       value={data.pools[specimen.poolId].label}
     />
-  ) : null;
+  );
 
-  const units = specimen ? mapFormOptions(
+  const units = specimen.quantity && mapFormOptions(
     options.specimen.typeUnits[specimen.typeId], 'label'
-  ) : null;
-  const quantityField = specimen ? (
-    <InlineField
-      loading={props.loading}
+  );
+  const quantityField = specimen && (
+    <InlineForm
       label='Quantity'
-      clearAll={props.clearAll}
-      updateValue={()=>props.updateSpecimen(current.specimen)}
-      edit={() => props.edit('quantity')}
-      editValue={() => props.editSpecimen(specimen)}
+      updateValue={specHand.put}
       value={Math.round(specimen.quantity * 100) / 100+
-      ' '+options.specimen.units[specimen.unitId].label}
-      editable={editable.quantity}
+      ' '+(options.specimen.units[specimen.unitId]||{}).label}
     >
       <TextboxElement
         name='quantity'
-        onUserInput={props.setSpecimen}
-        value={props.current.specimen.quantity}
-        errorMessage={props.errors.specimen.quantity}
+        onUserInput={specHand.set}
+        value={specimen.quantity}
+        errorMessage={sErrors.quantity}
       />
       <SelectElement
         name='unitId'
         options={units}
-        onUserInput={props.setSpecimen}
-        value={props.current.specimen.unitId}
-        errorMessage={props.errors.specimen.unitId}
+        onUserInput={specHand.set}
+        value={specimen.unitId}
+        errorMessage={sErrors.unitId}
       />
-    </InlineField>
-  ) : null;
+    </InlineForm>
+  );
 
-  const fTCycleField = () => {
-    if (specimen
-        && options.specimen.types[specimen.typeId].freezeThaw == 1) {
-      // const changeCycle = (value) => {
-      //   props.editSpecimen(specimen)
-      //   .then(() => {
-      //     let cycle = specimen.fTCycle;
-      //     cycle = cycle+value;
-      //     props.setSpecimen('fTCycle', cycle);
-      //   })
-      //   .then(()=>props.updateSpecimen(props.current.specimen));
-      // };
-      // const increaseCycle = () => changeCycle(1);
-      // const decreaseCycle = () => changeCycle(-1);
-      // const updateFTCycle = loris.userHasPermission('biobank_specimen_update') ? (
-      //   <div>
-      //     {specimen.fTCycle > 0 ? (
-      //       <div className='action' title='Remove Cycle'>
-      //         <span
-      //           className='action-button update'
-      //           onClick={decreaseCycle}
-      //         >
-      //           <span className='glyphicon glyphicon-minus'/>
-      //         </span>
-      //       </div>
-      //     ) : null}
-      //     <div className='action' title='Add Cycle'>
-      //       <span className='action-button update' onClick={increaseCycle}>
-      //         <span className='glyphicon glyphicon-plus'/>
-      //       </span>
-      //     </div>
-      //   </div>
-      // ) : null;
+  const fTCycleField = specimen.fTCycle && (
+    <InlineForm
+      label={'Freeze-Thaw Cycle'}
+      updateValue={options.specimen.types[specimen.typeId].freezeThaw == 1 && specHand.put}
+      value={specimen.fTCycle || 0}
+    >
+      <NumericElement
+        name='fTCycle'
+        onUserInput={specHand.set}
+        value={specimen.fTCycle}
+        errorMessage={sErrors.fTCycle}
+      />
+    </InlineForm>
+  );
 
-      const editFTCycle = () => props.edit('fTCycle');
-      return (
-        <InlineField
-          loading={props.loading}
-          label={'Freeze-Thaw Cycle'}
-          clearAll={props.clearAll}
-          updateValue={() => props.updateSpecimen(props.current.specimen)}
-          edit={editFTCycle}
-          editValue={() => props.editSpecimen(specimen)}
-          value={specimen.fTCycle || 0}
-          editable={editable.fTCycle}
-        >
-          <NumericElement
-            name='fTCycle'
-            onUserInput={props.setSpecimen}
-            value={props.current.specimen.fTCycle}
-            errorMessage={props.errors.specimen.fTCycle}
-          />
-        </InlineField>
-      );
-    }
-  };
-
-  const editTemperature = () => props.edit('temperature');
   const temperatureField = (
-    <InlineField
-      loading={props.loading}
+    <InlineForm
       label={'Temperature'}
-      clearAll={props.clearAll}
-      updateValue={updateContainer}
-      edit={!container.parentContainerId && editTemperature}
-      editValue={editContainer}
+      updateValue={!container.parentContainerId && contHand.put}
       value={container.temperature + '°'}
-      editable={editable.temperature}
     >
       <TextboxElement
         name='temperature'
-        onUserInput={props.setContainer}
-        value={props.current.container.temperature}
-        errorMessage={props.errors.container.temperature}
+        onUserInput={contHand.set}
+        value={container.temperature}
+        errorMessage={cErrors.temperature}
       />
-    </InlineField>
+    </InlineForm>
   );
 
   const stati = mapFormOptions(options.container.stati, 'label');
-  const renderCommentsField = () => {
-    if (stati[props.current.container.statusId] !== 'Discarded' &&
-        stati[props.current.container.statusId] !== 'Dispensed' &&
-        stati[props.current.container.statusId] !== 'Shipped') {
-      return [];
-    }
-    return (
-      <TextareaElement
-        name='comments'
-        onUserInput={props.setContainer}
-        value={props.current.container.comments}
-        required={true}
-      />
-    );
-  };
   const statusField = (
-    <InlineField
-      loading={props.loading}
+    <InlineForm
       label={'Status'}
-      clearAll={props.clearAll}
-      updateValue={updateContainer}
-      edit={() => props.edit('status')}
-      editValue={editContainer}
+      updateValue={contHand.put}
       value={options.container.stati[container.statusId].label}
       subValue={container.comments}
-      editable={editable.status}
     >
       <SelectElement
         name='statusId'
         options={stati}
-        onUserInput={props.setContainer}
-        value={props.current.container.statusId}
-        errorMessage={props.errors.container.statusId}
+        onUserInput={contHand.set}
+        value={container.statusId}
+        errorMessage={cErrors.statusId}
       />
-      {renderCommentsField()}
-    </InlineField>
+    </InlineForm>
   );
 
   const projectField = (
-    <InlineField
-      loading={props.loading}
+    <InlineForm
       label='Projects'
-      clearAll={props.clearAll}
-      updateValue={updateContainer}
-      edit={() => props.edit('project')}
-      editValue={editContainer}
+      updateValue={contHand.put}
       value={container.projectIds.length !== 0 ?
        container.projectIds
          .map((id) => options.projects[id])
          .join(', ') : 'None'}
-      editable={editable.project}
     >
       <SelectElement
         name='projectIds'
-        options={props.options.projects}
-        onUserInput={props.setContainer}
+        options={options.projects}
+        onUserInput={contHand.set}
         multiple={true}
         emptyOption={false}
-        value={props.current.container.projectIds}
-        errorMessage={props.errors.container.projectIds}
+        value={container.projectIds}
+        errorMessage={cErrors.projectIds}
       />
-    </InlineField>
+    </InlineForm>
   );
 
   const centerField = (
-    <InlineField
+    <InlineForm
       label='Site'
-      value={container.center}
+      value={options.centers[container.centerId]}
     />
   );
 
   const parentSpecimenField = () => {
-    if ((specimen||{}).parentSpecimenIds) {
+    if (specimen.parentSpecimenIds.length > 0) {
       const parentSpecimenBarcodes = Object.values(specimen.parentSpecimenIds)
       .map((id) => {
         const barcode = data.containers[data.specimens[id].containerId].barcode;
@@ -251,7 +172,7 @@ function Globals(props) {
       .reduce((prev, curr) => [prev, ', ', curr]);
 
       return (
-        <InlineField
+        <InlineForm
           label={'Parent Specimen'}
           value={parentSpecimenBarcodes || 'None'}
         />
@@ -259,7 +180,6 @@ function Globals(props) {
     }
   };
 
-  // TODO: Find a way to make this conform to the GLOBAL ITEM structure.
   const parentContainerField = () => {
     if (loris.userHasPermission('biobank_container_view')) {
       // Set Parent Container Barcode Value if it exists
@@ -275,44 +195,27 @@ function Globals(props) {
       const updateParentContainer = () => {
         if (loris.userHasPermission('biobank_container_update')) {
           return (
-            <div>
-              <div className='action' title='Move Container'>
-                <span
-                  className='action-button update'
-                  onClick={() => {
-                    props.edit('containerParentForm');
-                    editContainer();
-                  }}
-                >
-                  <span className='glyphicon glyphicon-chevron-right'/>
-                </span>
-              </div>
-              <div>
-                <Modal
-                  title='Update Parent Container'
-                  onClose={props.clearAll}
-                  show={editable.containerParentForm}
-                  onSubmit={props.uC}
-                >
-                  <ContainerParentForm
-                    display={true}
-                    current={current}
-                    container={container}
-                    options={options}
-                    data={data}
-                    setContainer={props.setContainer}
-                    setCurrent={props.setCurrent}
-                  />
-                </Modal>
-              </div>
-            </div>
+             <TriggerableModal
+               title='Update Parent Container'
+               label='Move Container'
+               onSubmit={contHand.put}
+             >
+               <ContainerParentForm
+                 display={true}
+                 current={current}
+                 container={container}
+                 options={options}
+                 data={data}
+                 setContainer={contHand.set}
+               />
+             </TriggerableModal>
           );
         }
       };
 
       let coordinate;
       if (container.coordinate) {
-        coordinate = props.getCoordinateLabel(container);
+        coordinate = container.getCoordinateLabel();
       }
 
       return (
@@ -331,14 +234,14 @@ function Globals(props) {
     }
   };
 
-  const candidateSessionField = specimen ? (
+  const candidateSessionField = specimen.candidateId && (
     <div>
-      <InlineField
+      <InlineForm
         label='PSCID'
         value={options.candidates[specimen.candidateId].pscid}
         link={loris.BaseURL+'/'+specimen.candidateId}
       />
-      <InlineField
+      <InlineForm
         label='Visit Label'
         value={options.sessions[specimen.sessionId].label}
         link={
@@ -348,39 +251,73 @@ function Globals(props) {
         }
       />
     </div>
-  ) : null;
+  );
+
+  const style = {
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+  };
 
   return (
-    <div className="globals">
-      <div className='list'>
-        {specimenTypeField}
-        {containerTypeField}
-        {poolField}
-        {quantityField}
-        {fTCycleField()}
-        {temperatureField}
-        {statusField}
-        {projectField}
-        {centerField}
-        {parentSpecimenField()}
-        {parentContainerField()}
-        {candidateSessionField}
-      </div>
+    <div style={style}>
+      {specimenTypeField}
+      {containerTypeField}
+      {poolField}
+      {quantityField}
+      {fTCycleField}
+      {temperatureField}
+      <InlineForm
+        label={'Lot Number'}
+        updateValue={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
+        value={container.lotNumber}
+        pencil={true}
+      >
+        <TextboxElement
+          name='lotNumber'
+          onUserInput={contHand.set}
+          value={container.lotNumber}
+          errorMessage={cErrors.lotNumber}
+        />
+      </InlineForm>
+      <InlineForm
+        label={'Expiration Date'}
+        updateValue={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
+        value={container.expirationDate}
+        pencil={true}
+      >
+        <DateElement
+          name='expirationDate'
+          onUserInput={contHand.set}
+          value={container.expirationDate}
+          errorMessage={cErrors.expirationDate}
+          today={false}
+        />
+      </InlineForm>
+      {statusField}
+      {projectField}
+      {centerField}
+      {parentSpecimenField()}
+      {parentContainerField()}
+      {candidateSessionField}
     </div>
   );
 }
 
-Globals.propTypes = {
-};
-
 /**
- * Inline Field
+ * Item
  *
  * @param {object} props
  * @return {*}
  **/
-function Item(props) {
-  return <div className="item">{props.children}</div>;
+function Item({children}) {
+  const style = {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: 'auto 0',
+  };
+  return <div style={style}>{children}</div>;
 }
 
 /**
@@ -389,8 +326,19 @@ function Item(props) {
  * @param {object} props
  * @return {*}
  **/
-function InlineField(props) {
-  const fields = React.Children.map(props.children, (child) => {
+function InlineForm(props) {
+  const {children, label, pencil, updateValue, link, value, subValue} = props;
+  const [loading, setLoading] = useState(false);
+  const [editable, setEditable] = useState(false);
+
+  const update = async () => {
+    setLoading(true);
+    await updateValue();
+    setEditable(false);
+    setLoading(false);
+  };
+
+  const fields = React.Children.map(children, (child) => {
     return (
       <div style={{flex: '1 0 25%', minWidth: '90px'}}>
         {React.cloneElement(child, {inputClass: 'col-lg-11'})}
@@ -398,88 +346,85 @@ function InlineField(props) {
     );
   });
 
-  // loris.userHasPermission('biobank_container_update') should determine if 'edit'
-  // can be passed in the first place.
-  const editButton = props.edit instanceof Function && !props.editable && (
-    <div className='action' title={'Update '+props.label}>
-      <span
-        className={props.pencil ? 'glyphicon glyphicon-pencil' : 'action-button update'}
-        onClick={() => {
-          props.edit();
-          props.editValue();
-        }}
-      >
-        {!props.pencil && <span className='glyphicon glyphicon-chevron-right'/>}
-      </span>
-    </div>
+  const editButton = !editable && updateValue instanceof Function && (
+    <ActionButton title={'Update '+label} onClick={() => setEditable(true)}/>
   );
 
-  const loader = props.loading && (
-    <React.Fragment>
+  // pencil ? glyphicon glyphicon-pencil : regularAction
+
+  const loader = loading && (
+    <>
       <div style={{flex: '0 1 15%', margin: '0 1%'}}>
         <Loader size={20}/>
       </div>
       <div style={{flex: '0 1 15%', margin: '0 1%'}}>
         <h5 className='animate-flicker'>Saving...</h5>
       </div>
-    </React.Fragment>
+    </>
   );
 
-  const submitButton = !props.loading && (
-    <React.Fragment>
+  const submitButton = !loading && (
+    <>
       <div style={{flex: '0 1 15%', margin: '0 1%'}}>
         <ButtonElement
           label="Update"
-          onUserInput={props.updateValue}
+          onUserInput={update}
           columnSize= 'col-xs-11'
         />
       </div>
       <div style={{flex: '0 1 15%', margin: '0 1%'}}>
-        <a onClick={props.clearAll} style={{cursor: 'pointer'}}>
+        <a onClick={()=>setEditable(false)} style={{cursor: 'pointer'}}>
           Cancel
         </a>
       </div>
-    </React.Fragment>
+    </>
   );
 
-  const value = props.link ? (
-    <a href={props.link}>{props.value}</a>
-  ) : props.value;
+  const linkValue = link ? (
+    <a href={link}>{value}</a>
+  ) : value;
 
-  const renderField = props.editable ? (
-    <div className='field'>
-      {props.label}
-      <div className='inline-field'>
+  const fieldStyle = {
+    flexGrow: 1,
+  };
+
+  const inlineFieldStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    flexDirection: 'row',
+    alignItems: 'center',
+  };
+
+  const valueStyle = {
+    fontSize: '22px',
+  };
+
+  const renderField = editable ? (
+    <div style={fieldStyle}>
+      {label}
+      <div style={inlineFieldStyle}>
         {fields}
         {submitButton}
         {loader}
       </div>
     </div>
   ) : (
-    <div className="field">
-      {props.label}
-      {props.pencil && editButton}
-      <div className='value'>
-        {value}
+    <div style={fieldStyle}>
+      {label}
+      {pencil && editButton}
+      <div style={valueStyle}>
+        {linkValue || '—'}
       </div>
-      {props.subValue}
+      {subValue}
     </div>
   );
 
   return (
     <Item>
       {renderField}
-      {!props.pencil && editButton}
+      {!pencil && editButton}
     </Item>
   );
 }
-
-InlineField.propTypes = {
-  clearAll: PropTypes.func,
-  specimen: PropTypes.object,
-  updateValue: PropTypes.func,
-  subValue: PropTypes.string,
-  className: PropTypes.string,
-};
 
 export default Globals;

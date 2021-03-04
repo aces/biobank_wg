@@ -48,13 +48,13 @@ class ShipmentHandler
      * @param Database $db   Database Instance.
      * @param User     $user User Instance.
      */
-    function __construct(Shipment $shipment, \Database $db, \User $user)
+    function __construct(array $data, \Database $db, \User $user)
     {
-        $this->shipment = $shipment;
         $this->db       = $db;
         $this->user     = $user;
         $this->dao      = $this->getDataProvisioner();
-        $this->validate();
+        $this->shipment = new Shipment($data);
+        $this->validate($this->shipment);
     }
 
     /**
@@ -146,161 +146,255 @@ class ShipmentHandler
     /**
      * Validates Shipment Data before being saved
      *
+     * @param Shipment $shipment
+     *
      * @return void
      */
-    private function validate() : void
+    private function validate(Shipment $shipment) : void
     {
-        $this->errors = [];
-        $this->validateBarcode();
-        $this->validateDestinationCenter();
-        $this->validateLogs();
-        $this->validateContainers();
+        $errors = [];
+        $errors = $this->validateBarcode($shipment, $errors);
+        $errors = $this->validateDestinationCenterId($shipment, $errors);
+        $errors = $this->validateLogs($shipment, $errors);
+        $errors = $this->validateContainers($shipment, $errors);
+        $this->errors = $errors;
     }
 
     /**
      * Validates Shipment Object Barcode.
      *
-     * @return void
+     * @param Shipment $shipment
+     * @param array    $errors
+     *
+     * @return array
      */
-    private function validateBarcode() : void
+    private function validateBarcode(Shipment $shipment, array $errors) : array
     {
-        if (empty($this->shipment->getBarcode())) {
-            $this->errors += ['barcode' => 'Barcode is required.'];
+        $error = '';
+        if (empty($shipment->barcode)) {
+            $error .= 'Barcode is required. ';
         }
+        if (!empty($error)) {
+            $errors['barcode'] = $error;
+        }
+        return $errors;
     }
 
     /**
      * Validates Shipment Object Destination Center.
+     *
+     * @param Shipment $shipment
+     * @param array    $errors
+     *
+     * @return array
      */
-    private function validateDestinationCenter() : void
+    private function validateDestinationCenterId(Shipment $shipment, array $errors) : array
     {
-        if (empty($this->shipment->getDestinationCenter())) {
-            $this->errors += ['destinationCenter' => 'Destination Center is required.'];
+        $error = '';
+        if (empty($shipment->destinationCenterId)) {
+            $error .= 'Destination Center is required.';
         }
 
         // TODO: Check that Destination Center is an actual center.
+
+        if (!empty($error)) {
+            $errors['destinationCenterId'] = $error;
+        }
+        return $errors;
     }
 
     /**
      * Validates Shipment Object Containers
      *
-     * @return void
+     * @param Shipment $shipment
+     * @param array    $errors
+     *
+     * @return array
      */
-    private function validateContainers() : void
+    private function validateContainers(Shipment $shipment, array $errors) : array
     {
-        if (empty($this->shipment->getContainers())) {
-            $this->errors += ['containers' => 'Atleast 1 container must be selected.'];
+        $error = '';
+        $field = 'containerIds';
+
+        // Check that there is atleast one container in the shipment.
+        if (empty($shipment->containerIds)) {
+            $errors[$field] = 'Atleast 1 container must be selected.';
+            return $errors;
         }
 
-        // TODO: Make sure that all containers are the same location and that
-        // they are the same as the log creation center!
+        $containerDAO = new ContainerDAO($this->db);
+        // Check that containers are all at the same center.
+        $container1 = $containerDAO->getInstanceFromId((int) $shipment->containerIds[0]);
+        foreach ($shipment->containerIds as $containerId) {
+            // TODO: Not sure if casting to int should be done here or elsewhere.
+            $container = $containerDAO->getInstanceFromId((int) $containerId);
+            if ($container->getCenterID() != $container1->getCenterID()) {
+                $errors[$field] = 'All Containers must be at the same Center.';
+                return $errors;
+            }
+        }
+
+        // TODO: this could maybe be improved since it only checks 1 shipment.
+        // Check that the containers are at the same center as the shipment.
+        if ($shipment->logs[0]->centerId !== $container1->getCenterID()) {
+            $error .= 'Containers must be at the same site at the shipment. ';
+        }
+        
+        if (!empty($error)) {
+            $errors[$field] = $error;
+        }
+
+        return $errors;
     }
 
     /**
      * Validates Shipment Object Logs.
      *
-     * @return void
+     * @param Shipment $shipment
+     * @param array    $array
+     *
+     * @return array
      */
-    private function validateLogs() : void
+    private function validateLogs(Shipment $shipment, array $errors) : array
     {
-        $logs = $this->shipment->getLogs();
-        foreach ($logs as $i=>$log) {
-            $this->validateCenter($log, $i);
-            $this->validateStatus($log, $i);
-            $this->validateUser($log, $i);
-            $this->validateTemperature($log, $i);
-            $this->validateDate($log, $i);
-            $this->validateTime($log, $i);
+        $logsErrors = [];
+        foreach ($shipment->logs as $i=>$log) {
+            $logErrors = [];
+            $logErrors = $this->validateCenter($log, $logErrors);
+            $logErrors = $this->validateStatus($log, $logErrors);
+            $logErrors = $this->validateUser($log, $logErrors);
+            $logErrors = $this->validateTemperature($log, $logErrors);
+            $logErrors = $this->validateDate($log, $logErrors);
+            $logErrors = $this->validateTime($log, $logErrors);
+            if (!empty($logErrors)) {
+              $logsErrors[$i] = $logErrors;
+            }
         }
+
+        if (!empty($logsErrors)) {
+            $errors['logs'] = $logsErrors;
+        }
+        
+        return $errors;
     }
 
     /**
      * Validates Shipment Log Center.
      *
-     * @param array $log Log to be validated.
-     * @param int   $i
+     * @param Log   $log Log to be validated.
+     * @param array $errors
      *
-     * @return void
+     * @return array
      */
-    private function validateCenter(array $log, int $i) : void
+    private function validateCenter(Log $log, array $errors) : array
     {
-        if (empty($log['center'])) {
-            $this->errors['logs'][$i] = ['center' => 'Center is required.'];
+        $error = '';
+        if (empty($log->centerId)) {
+            $error .= 'Center is required';
         }
+        if (!empty($error)) {
+            $errors['centerId'] = $error;
+        }
+        return $errors;
     }
 
     /**
      * Validates Shipment Log Status.
      *
-     * @param array $log Log to be validated.
-     * @param int   $i
+     * @param Log   $log Log to be validated.
+     * @param array $errors
      *
-     * @return void
+     * @return array
      */
-    private function validateStatus(array $log, int $i) : void
+    private function validateStatus(Log $log, array $errors) : array
     {
-        if (empty($log['status'])) {
-            $this->errors['logs'][$i] = ['status' => 'Status is required.'];
+        $error = '';
+        if (empty($log->status)) {
+            $error .= 'Status is required.';
         }
+        if (!empty($error)) {
+            $errors['status'] = $error;
+        }
+        return $errors;
     }
 
     /**
      * Validates Shipment Log Center.
      *
-     * @param array $log Log to be validated.
-     * @param int   $i
+     * @param Log $log Log to be validated.
+     * @param array $errors
      *
-     * @return void
+     * @return array
      */
-    private function validateUser(array $log, int $i) : void
+    private function validateUser(Log $log, array $errors) : array
     {
-        if (empty($log['user'])) {
-            $this->errors['logs'][$i] = ['user' => 'User is required.'];
+        $error = '';
+        if (empty($log->user)) {
+            $error .= 'User is required.';
         }
+        if (!empty($error)) {
+            $errors['user'] = $error;
+        }
+        return $errors;
     }
 
     /**
      * Validates Shipment Log Temperature.
      *
-     * @param array $log Log to be validated.
-     * @param int   $i
+     * @param Log $log Log to be validated.
+     * @param array $errors
      *
-     * @return void
+     * @return array
      */
-    private function validateTemperature(array $log, int $i) : void
+    private function validateTemperature(Log $log, array $errors) : array
     {
-        if (empty($log['temperature'])) {
-            $this->errors['logs'][$i] = ['temperature' => 'Temperature is required.'];
+        $error = '';
+        if (empty($log->temperature)) {
+            $error .= 'Temperature is required.';
         }
+        if (!empty($error)) {
+            $errors['temperature'] = $error;
+        }
+        return $errors;
     }
 
     /**
      * Validates Shipment Log Date.
      *
-     * @param array $log Log to be validated.
-     * @param int   $i
+     * @param Log   $log Log to be validated.
+     * @param array $errors
      *
-     * @return void
+     * @return array
      */
-    private function validateDate(array $log, int $i) : void
+    private function validateDate(Log $log, array $errors) : array
     {
-        if (empty($log['date'])) {
-            $this->errors['logs'][$i] = ['date' => 'Date is required.'];
+        $error = '';
+        if (empty($log->date)) {
+            $error .= 'Date is required.';
         }
+        if (!empty($error)) {
+            $errors['date'] = $error;
+        }
+        return $errors;
     }
 
     /**
      * Validates Shipment Log Time.
      *
-     * @param array $log Log to be validated.
-     * @param int   $i
+     * @param Log   $log Log to be validated.
+     * @param array $errors
      *
-     * @return void
+     * @return array
      */
-    private function validateTime(array $log, int $i) : void
+    private function validateTime(Log $log, array $errors) : array
     {
-        if (empty($log['time'])) {
-            $this->errors['logs'][$i] = ['time' => 'Time is required.'];
+        $error = '';
+        if (empty($log->time)) {
+            $error .= 'Time is required.';
         }
+        if (!empty($error)) {
+            $errors['time'] = $error;
+        }
+        return $errors;
     }
 }

@@ -86,8 +86,8 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
     {
         $query = "SELECT s.ShipmentID as id,
                          s.Barcode as barcode,
-                         psc.Name as destinationCenter,
-                         GROUP_CONCAT(bc.Barcode) as containers
+                         s.DestinationCenterID as destinationCenterId,
+                         GROUP_CONCAT(bc.ContainerId) as containerIds
                   FROM shipment s
                   LEFT JOIN psc psc
                     ON (s.DestinationCenterID=psc.CenterID)
@@ -108,8 +108,8 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
         $shipmentRows = $this->db->pselectWithIndexKey($query, [], 'barcode');
         $logs = $this->getLogs();
         foreach ($shipmentRows as $barcode => $shipmentRow) {
-            $shipmentRow['containers'] = $shipmentRow['containers'] ?
-              explode(',', $shipmentRow['containers']) : [];
+            $shipmentRow['containerIds'] = $shipmentRow['containerIds'] ?
+              explode(',', $shipmentRow['containerIds']) : [];
             $shipmentRow['logs'] = $logs[$barcode];
             $shipment = new Shipment($shipmentRow);
             $shipments[$barcode] = $shipment;
@@ -121,7 +121,7 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
     public function getLogs() : array
     {
         $query = "SELECT s.Barcode as barcode,
-                         psc.Name as center,
+                         sl.CenterID as centerId,
                          u.Real_name as user,
                          ss.Label as status,
                          sl.Temperature as temperature,
@@ -141,7 +141,7 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
 
         $logs = [];
         foreach ($logRows as $barcode => $logRow) {
-            $logs[$barcode][] = $logRow; 
+            $logs[$barcode][] = $logRow;
         }
         return $logs;
     }
@@ -175,6 +175,7 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     public function saveInstance(Shipment $shipment) : Shipment
     {
+        //TODO: This should probably have a try catch block of sorts.
         // Converts Shipment Object into SQL format and inserts into database.
         $shipmentSQL = $this->getSQLFromInstance($shipment);
         $this->db->insertOnDuplicateUpdate(
@@ -182,9 +183,9 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
             $shipmentSQL
         );
 
-        $shipmentId = $shipment->getId() ?? $this->db->getLastInsertID();
+        $shipmentId = $shipment->id ?? $this->db->getLastInsertID();
 
-        foreach($shipment->getLogs() as $log) {
+        foreach($shipment->logs as $log) {
             $logSQL = $this->getLogSQLFromInstance($log, $shipmentId);
             $this->db->insertOnDuplicateUpdate(
                 'shipment_log',
@@ -192,15 +193,33 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
             );
         }
 
-        foreach($shipment->getContainers() as $barcode) {
-            $containerSQL = $this->getContainerSQLFromInstance($barcode, $shipmentId);
+        $containerIds = $this->getAllContainerIds($shipment);
+        foreach($containerIds as $containerId) {
             $this->db->insertOnDuplicateUpdate(
                 'biobank_container_shipment_rel',
-                $containerSQL
+                ['ShipmentID' => $shipmentId, 'ContainerID' => $containerId]
             );
         }
 
-        return $this->getInstanceFromBarcode($shipment->getBarcode());
+        return $this->getInstanceFromBarcode($shipment->barcode);
+    }
+
+    private function getAllContainerIds(Shipment $shipment) : array
+    {
+        $containerDAO = new ContainerDAO($this->db);
+        $childContainerIds = [];
+        foreach($shipment->containerIds as $containerId) {
+            $container = $containerDAO->getInstanceFromId((int) $containerId);
+            $childContainerIds = array_merge(
+                $childContainerIds,
+                $containerDAO->getAllChildContainerIds($container)
+            );
+        }
+        $allContainerIds = array_merge(
+            $childContainerIds,
+            $shipment->containerIds
+        );
+        return array_unique($allContainerIds);
     }
 
     /**
@@ -215,56 +234,32 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     private function getSQLFromInstance(Shipment $shipment) : array
     {
-        // TODO: These queries feel clumsy. There is likely a better way to get
-        // the ID.
-        $destinationCenterId = $this->db->pselectOne(
-            'SELECT CenterID FROM psc WHERE Name=:n', ['n' =>$shipment->getDestinationCenter()]
-        );
-
         return [
-                'ShipmentID'          => $shipment->getId(),
-                'Barcode'             => $shipment->getBarcode(),
-                'DestinationCenterID' => $destinationCenterId,
+                'ShipmentID'          => $shipment->id,
+                'Barcode'             => $shipment->barcode,
+                'DestinationCenterID' => $shipment->destinationCenterId,
                ];
     }
 
-    // TODO: LOG SHOULD BECOME IT'S OWN ENTITY
-    private function getLogSQLFromInstance(array $log, string $shipmentId) : array
+    private function getLogSQLFromInstance(Log $log, string $shipmentId) : array
     {
         // TODO: These queries feel clumsy. There is likely a better way to get
         // the ID.
-        $centerId = $this->db->pselectOne(
-            'SELECT CenterID FROM psc WHERE Name=:n', ['n' => $log['center']]
-        );
         $statusId = $this->db->pselectOne(
-            'SELECT StatusID from shipment_status WHERE Label=:l', ['l' => $log['status']]
+            'SELECT StatusID from shipment_status WHERE Label=:l', ['l' => $log->status]
         );
         $userId = $this->db->pselectOne(
-            'SELECT ID FROM users WHERE UserID=:u', ['u' => $log['user']]
+            'SELECT ID FROM users WHERE UserID=:u', ['u' => $log->user]
         );
 
         return [
                 'ShipmentID'  => $shipmentId,
-                'CenterID'    => $centerId,
+                'CenterID'    => $log->centerId,
                 'StatusID'    => $statusId,
-                'Temperature' => $log['temperature'],
-                'Date'        => $log['date'],
-                'Time'        => $log['time'],
+                'Temperature' => $log->temperature,
+                'Date'        => (new \DateTime($log->date))->format('Y-m-d H:i'),
+                'Time'        => (new \DateTime($log->time))->format('Y-m-d H:i'),
                 'UserID'      => $userId,
-               ];
-    }
-
-    private function getContainerSQLFromInstance(string $barcode, string $shipmentId) : array
-    {
-        // TODO: This should maybe make use of the container object to get the ID
-        // instead of resorting to a query.
-        $containerId = $this->db->pselectOne(
-            'SELECT ContainerID FROM biobank_container WHERE Barcode=:b', ['b' => $barcode]
-        );
-
-        return [
-                'ShipmentID' => $shipmentId,
-                'ContainerID' => $containerId,
                ];
     }
 }

@@ -379,7 +379,6 @@ class SpecimenDAO extends \LORIS\Data\ProvisionerInstance
             foreach ($row as $value) {
                 $pA[$row['protocolId']][$row['attributeId']]['label']           = $row['label'];
                 $pA[$row['protocolId']][$row['attributeId']]['datatypeId']      = $row['datatypeId'];
-                $pA[$row['protocolId']][$row['attributeId']]['refTableId']      = $row['refTableId'];
                 $pA[$row['protocolId']][$row['attributeId']]['required']        = (int) $row['required'];
                 $pA[$row['protocolId']][$row['attributeId']]['showInDataTable'] = (int) $row['showInDataTable'];
             }

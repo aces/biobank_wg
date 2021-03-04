@@ -102,7 +102,7 @@ export async function post(data, url, method, onSuccess) {
     // both then and catch resolve in case the returned data is not in
     // json format.
     return response.json()
-    .catch((data) => resolve(data));
+    .catch((data) => data);
   } else {
     const data = await response.json();
 

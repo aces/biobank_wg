@@ -144,7 +144,6 @@ class ContainerController
                 'types'           => $this->dao->getTypes(),
                 'typesPrimary'    => $this->dao->getTypes(['Primary' => 1]),
                 'typesNonPrimary' => $this->dao->getTypes(['Primary' => 0]),
-                'dimensions'      => $this->dao->getDimensions(),
                 'stati'           => $this->dao->getStati(),
                );
     }
@@ -424,14 +423,14 @@ class ContainerController
      */
     private function validateCenter(Container $container) : void
     {
-        if (is_null($container->getCenter())) {
+        if (is_null($container->getCenterId())) {
             throw new \BadRequest("Center value must be set.");
         }
 
         $parentContainerId = $container->getParentContainerId();
         if (false) {
             $parentContainer = $this->dao->getInstanceFromId($parentContainerId);
-            if ($container->getCenter() !== $parentContainer->getCenter()) {
+            if ($container->getCenterId() !== $parentContainer->getCenterId()) {
                 $barcode = $container->getBarcode();
                 throw new \BadRequest(
                         $container->getBarcode()." must be at the same location 
@@ -490,7 +489,7 @@ class ContainerController
             }
 
             $parentContainer = $this->dao->getInstanceFromId($parentContainerId); 
-            $dimensions      = $this->dao->getDimensions()[$parentContainer->getDimensionId()];
+            $dimensions      = $this->dao->getDimensions($parentContainer->getDimensionId());
             $capacity        = $dimensions['x'] * $dimensions['y'] * $dimensions['z'];
             if ($container->getCoordinate() > $capacity) {
                throw new \BadRequest(

@@ -2,32 +2,25 @@ import {useState, useEffect} from 'react';
 import Container from './Container.js';
 import {get, post} from './helpers.js';
 
-// function Shipments(shipments = {}) {
-//   console.log(shipments);
-//   return new Map(Object.entries(shipments));
-// }
-
 export function useShipment(initShipment = {}) {
   const [shipment, setShipment] = useState(new Shipment(initShipment));
-  // TODO: FIGURE OUT A BETTER WAY OF HANDLING LOG ERRORS. NO MORE || {} EVERYWHERE.
-  // DONT DO IT. JUST DON'T.
   const [errors, setErrors] = useState({logs: []});
 
   useEffect(() => {
     const loadCenter = async () => {
-      const barcode = shipment.containers[0];
-      const container = await new Container().load(barcode);
-      setShipment(shipment.set('logs', shipment.setLog('center', container.center, 0)));
+      const containerId = shipment.containerIds[0];
+      const container = await new Container().load(containerId);
+      setShipment(shipment.set('logs', shipment.setLog('centerId', container.centerId, 0)));
     };
 
     // If containers changes, update the origin center!
-    if (shipment.containers.length === 1) {
+    if (shipment.containerIds.length === 1) {
       loadCenter();
     }
-  }, [shipment.containers[0]]);
+  }, [shipment.containerIds[0]]);
 
   this.set = (name, value) => setShipment(shipment.set(name, value));
-  this.setContainers = (value) => this.set('containers', value);
+  this.setContainerIds = (value) => this.set('containerIds', value);
   this.setLogs = (value) => this.set('logs', value);
   this.setLog = (name, value, index) => this.setLogs(shipment.setLog(name, value, index));
   this.remove = (name) => setShipment(shipment.remove(name));
@@ -45,11 +38,11 @@ export function useShipment(initShipment = {}) {
 
 class Shipment {
   constructor(props = {}) {
+    this.id = props.id || null;
     this.barcode = props.barcode || null;
-    this.destinationCenter = props.destinationCenter || null;
+    this.destinationCenterId = props.destinationCenterId || null;
     this.logs = props.logs || [new Log({status: 'created'})];
-    this.containers = props.containers || [];
-    this.errors = {};
+    this.containerIds = props.containerIds || [];
   }
 
   set(name, value) {
@@ -60,8 +53,8 @@ class Shipment {
     return new Shipment({name, ...this});
   }
 
-  async load(barcode) {
-   const shipment = await get(`${loris.BaseURL}/biobank/shipments/${barcode}`);
+  async load(id) {
+   const shipment = await get(`${loris.BaseURL}/biobank/shipments/${id}`);
    return new Shipment(shipment);
   }
 
@@ -82,7 +75,7 @@ class Shipment {
 class Log {
   constructor(props = {}) {
     this.shipmentId = props.id || null;
-    this.center = props.center || null;
+    this.centerId = props.centerId || null;
     this.status = props.status || null;
     this.user = props.user || null;
     this.temperature = props.temperature || null;

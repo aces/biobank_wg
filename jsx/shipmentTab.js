@@ -46,18 +46,11 @@ function ShipmentTab(props) {
       shipment.id,
       shipment.barcode,
       shipment.status,
-      shipment.originCenter,
-      shipment.destinationCenter,
-      shipment.containers,
+      options.centers[shipment.originCenterId],
+      options.centers[shipment.destinationCenterId],
     ];
   });
 
-  // TODO: This is temporary until a more global solution is found.
-  // TODO: The shipment tab/form should be able to get this information itself honestly.
-  const centers = {};
-  Object.values(options.centers).forEach((value) => {
-    centers[value] = value;
-  });
   const users = {};
   // TODO: There has to be a better way to query this!!!
   Object.values(options.users).forEach((user) => {
@@ -76,21 +69,20 @@ function ShipmentTab(props) {
       options: options.shipment.statuses,
     }},
     {label: 'Origin Center', show: true, filter: {
-      name: 'originCenter',
+      name: 'originCenterId',
       type: 'select',
       options: options.centers,
     }},
     {label: 'Destination Center', show: true, filter: {
-      name: 'destinationCenter',
+      name: 'destinationCenterId',
       type: 'select',
-      options: centers,
+      options: options.centers,
     }},
-    {label: 'Containers', show: true},
   ];
 
   const forms = [
     <ShipmentForm
-      centers={centers}
+      centers={options.centers}
       users={users}
       data={data}
       updateShipments={updateShipments}
@@ -136,24 +128,24 @@ function ShipmentForm(props) {
       <InputList
         name='barcode'
         label="Container"
-        items={shipment.containers}
-        setItems={handler.setContainers}
+        items={shipment.containerIds}
+        setItems={handler.setContainerIds}
         options={props.data.containers}
-        errorMessage={errors.containers}
+        errorMessage={errors.containerIds}
       />
       <SelectElement
-        name='destinationCenter'
+        name='destinationCenterId'
         label='Destination Center'
         onUserInput={handler.set}
-        value={shipment.destinationCenter}
+        value={shipment.destinationCenterId}
         options={props.centers}
-        errorMessage={errors.destinationCenter}
+        errorMessage={errors.destinationCenterId}
         required={true}
       />
       <LogForm
         log={shipment.logs[logIndex]}
         setLog={(name, value) => handler.setLog(name, value, logIndex)}
-        errors={errors.logs[logIndex] || {}}
+        errors={errors.logs[logIndex]}
         {...props}
       />
     </TriggerableModal>
@@ -161,7 +153,7 @@ function ShipmentForm(props) {
 }
 
 function LogForm(props) {
-  const {log, setLog, errors} = props;
+  const {log, setLog, errors = {}} = props;
   return (
     <>
       <TextboxElement
@@ -169,6 +161,7 @@ function LogForm(props) {
         label='Temperature'
         onUserInput={setLog}
         value={log.temperature}
+        errorMessage={errors.temperature}
         required={true}
       />
       <DateElement
@@ -176,6 +169,7 @@ function LogForm(props) {
         label='Date'
         onUserInput={setLog}
         value={log.date}
+        errorMessage={errors.date}
         required={true}
       />
       <TimeElement
@@ -183,6 +177,7 @@ function LogForm(props) {
         label='Time'
         onUserInput={setLog}
         value={log.time}
+        errorMessage={errors.time}
         required={true}
       />
       <SelectElement

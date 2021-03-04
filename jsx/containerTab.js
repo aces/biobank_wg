@@ -74,20 +74,21 @@ class ContainerTab extends Component {
   }
 
   render() {
+    const {options} = this.props;
     const {editable} = this.state;
 
     const stati = mapFormOptions(
-      this.props.options.container.stati, 'label'
+      options.container.stati, 'label'
     );
     const containerTypesNonPrimary = mapFormOptions(
-      this.props.options.container.typesNonPrimary, 'label'
+      options.container.typesNonPrimary, 'label'
     );
     const containersNonPrimary = Object.values(this.props.data.containers)
       .reduce((result, container) => {
         // TODO: this check is necessary or else the page will go blank when the
         // first specimen is added.
         if (container) {
-          if (this.props.options.container.types[container.typeId].primary == 0) {
+          if (options.container.types[container.typeId].primary == 0) {
             result[container.id] = container;
           }
           return result;
@@ -104,7 +105,7 @@ class ContainerTab extends Component {
           container.typeId,
           container.statusId,
           container.projectIds,
-          container.center,
+          options.centers[container.centerId],
           container.parentContainerId,
         ];
       }
@@ -129,7 +130,7 @@ class ContainerTab extends Component {
       {label: 'Site', show: true, filter: {
         name: 'site',
         type: 'select',
-        options: this.props.options.centers,
+        options: options.centers,
       }},
       {label: 'Parent Barcode', show: true, filter: {
         name: 'parentBarcode',
@@ -164,7 +165,7 @@ class ContainerTab extends Component {
         />
         {loris.userHasPermission('biobank_container_create') ?
         <ContainerForm
-          options={this.props.options}
+          options={options}
           show={editable.containerForm}
           onClose={this.clearEditable}
           onSubmit={this.props.createContainers}

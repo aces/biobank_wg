@@ -38,34 +38,26 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @var string  $id
      * @var string  $barcode
-     * @var string  $originCenter
-     * @var string  $destinationCenter
-     * @var array   $containers
+     * @var string  $destinationCenterId
+     * @var array   $containerIds
      * @var array   $logs
      */
-    private $id;
-    private $barcode;
-    private $originCenter;
-    private $destinationCenter;
-    private $status;
-    private $containers;
-    private $logs;
+    public $id;
+    public $barcode;
+    public $destinationCenterId;
+    public $containerIds;
+    public $logs;
 
     /**
      * Initiliazes a new instance of the Shipment Class
      */
     function __construct(array $data)
     {
-        isset($data['id']) && $this->setId((int) ($data['id']));                                              
-        $this->setBarcode((string) $data['barcode']);
-        $this->setDestinationCenter((string) $data['destinationCenter']);
-        $this->setContainers((array) $data['containers']);
-        $this->setLogs((array) $data['logs']);
-
-        $originCenter = $this->logs[0]['center'];
-        $status = $this->logs[array_key_last($this->logs)]['status'];
-        $this->setOriginCenter((string) $originCenter);
-        $this->setStatus((string) $status);
+        $this->id = $data['id'] ?? null;
+        $this->barcode = $data['barcode'] ?? null;
+        $this->destinationCenterId = $data['destinationCenterId'] ?? null;
+        $this->containerIds = $data['containerIds'] ?? null;
+        $this->setLogs($data['logs']) ?? null;
     }
 
     /**
@@ -77,9 +69,7 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     private function setId(int $id) : void
     {
-        if ($id > 0) {
-            $this->id = $id;
-        }
+        $this->id = $id;
     }
 
     /**
@@ -107,9 +97,9 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Gets the tracking number of the shipment
      *
-     * @return string
+     * @return ?string
      */
-    public function getBarcode() : string
+    public function getBarcode() : ?string
     {
         return $this->barcode;
     }
@@ -117,45 +107,47 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Sets the origin center of the shipment
      *
-     * @param string $originCenter the shipment's origin center
+     * @param string $originCenterId the shipment's origin center
      *
      * @return void
      */
-    private function setOriginCenter(string $originCenter) : void
+    private function setOriginCenterId(string $originCenterId) : void
     {
-        $this->originCenter = $originCenter;
+        $this->originCenterId = $originCenterId;
     }
 
     /**
      * Gets the origin center of the shipment
      *
-     * @return string
+     * @return ?string
      */
-    public function getOriginCenter() : string
+    public function getOriginCenterId() : ?string
     {
-        return $this->originCenter;
+        if (!empty($this->getLogs())) {
+            return $this->getLogs()[0]->centerId;
+        }
     }
 
     /**
      * Sets the destination center of the shipment
      *
-     * @param string $destinationCenter the shipment's destination center
+     * @param string $destinationCenterId the shipment's destination center
      *
      * @return void
      */
-    private function setDestinationCenter(string $destinationCenter) : void
+    private function setDestinationCenterId(string $destinationCenterId) : void
     {
-        $this->destinationCenter = $destinationCenter;
+        $this->destinationCenterId = $destinationCenterId;
     }
 
     /**
      * Gets the destination center of the shipment
      *
-     * @return string
+     * @return ?string
      */
-    public function getDestinationCenter() : string
+    public function getDestinationCenterId() : ?string
     {
-        return $this->destinationCenter;
+        return $this->destinationCenterId;
     }
 
     /**
@@ -173,33 +165,36 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Gets the status of the shipment
      *
-     * @return string
+     * @return ?string
      */
-    public function getStatus() : string
+    public function getStatus() : ?string
     {
-        return $this->status;
+        if (!empty($this->getLogs())) {
+            $latestLog = $this->getLogs()[array_key_last($this->getLogs())];
+            return $latestLog->status;
+        }
     }
 
     /**
      * Sets the containers for the shipment
      *
-     * @param array $containers the shipment's containers
+     * @param array $containerIds the shipment's containers
      *
      * @return void
      */
-    private function setContainers(array $containers) : void
+    private function setContainerIds(array $containerIds) : void
     {
-        $this->containers = $containers;
+        $this->containerIds = $containerIds;
     }
 
     /**
      * Gets the containers of the shipment
      *
-     * @return array
+     * @return ?array
      */
-    public function getContainers() : array
+    public function getContainerIds() : ?array
     {
-        return $this->containers;
+        return $this->containerIds;
     }
 
     /**
@@ -211,7 +206,10 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     private function setLogs(array $logs) : void
     {
-        $this->logs = $logs;
+        // TODO: THis should maybe go in the SHipment Handler.
+        foreach ($logs as $i => $log) {
+            $this->logs[$i] = new Log($log);
+        }
     }
 
     /**
@@ -224,16 +222,6 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
         return $this->logs;
     }
 
-    public function setErrors(array $errors) : void
-    {
-        $this->errors = $errors;
-    }
-
-    public function getErrors()
-    {
-        return $this->errors;
-    }
-                                                                                
     /**                                                                         
      * A wrapper function for the jsonSerialize method of the Shipment Instance 
      * Class. This converts the Shipment Instance into an array.                
@@ -253,13 +241,13 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     public function jsonSerialize() : array
     {
         return array(
-                'id'                => $this->id,
-                'barcode'           => $this->barcode,
-                'originCenter'      => $this->originCenter,
-                'destinationCenter' => $this->destinationCenter,
-                'containers'        => $this->containers,
-                'status'            => $this->status,
-                'logs'              => $this->logs,
+                'id'                  => $this->id,
+                'barcode'             => $this->barcode,
+                'originCenterId'      => $this->getOriginCenterId(),
+                'destinationCenterId' => $this->destinationCenterId,
+                'containerIds'        => $this->containerIds,
+                'status'              => $this->getStatus(),
+                'logs'                => $this->logs,
                );
     }
 

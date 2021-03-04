@@ -90,14 +90,14 @@ class Containers implements RequestHandlerInterface
         $contDao = new ContainerDAO($db);
         // $barcode = basename($request->getUri()->getPath());
         // $pathparts = $request->getAttribute('pathparts');
-        $barcode = basename($request->getRequestTarget());
+        $id = basename($request->getRequestTarget());
 
         try {
             $db->beginTransaction();
             switch($request->getMethod()) {
             case 'GET':
-                if ($barcode != 'containers') {
-                    $containers = [$contDao->getInstanceFromBarcode($barcode)];
+                if ($id != 'containers') {
+                    $containers = [$contDao->getInstanceFromId((int) $id)];
                 } else {
                     $containers = $contCont->getInstances();
                 }
@@ -116,7 +116,7 @@ class Containers implements RequestHandlerInterface
             }
         } catch (\BadRequest $e) {
             $db->rollBack();
-            return new \LORIS\Http\Response\BadRequest($e->getMessage());
+            return new \LORIS\Http\Response\JSONResponse($e->getMessage(), 422);
         } catch (\Forbidden $e) {
             $db->rollBack();
             return new \LORIS\Http\Response\Forbidden($e->getMessage());
