@@ -10,6 +10,7 @@ import CustomFields from './customFields';
  * @return {*}
  **/
 const SpecimenProcessForm = (props) => {
+
   const setProcess = (name, value) => {
     let process = clone(props.process);
     process[name] = value;
@@ -34,7 +35,10 @@ const SpecimenProcessForm = (props) => {
     setProcess(name, value);
   };
 
-  const {specimen, process, processStage, typeId, options, errors, edit} = props;
+  const {specimen, processStage, options} = props;
+
+  const process = specimen.process;
+  const typeId = specimen.typeId;
 
   const updateButton = specimen && (
     <ButtonElement

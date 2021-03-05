@@ -1,7 +1,7 @@
 import React from 'react';
 import {Link} from 'react-router-dom';
 
-import LifeCycle from './lifeCycle.js';
+// import LifeCycle from './lifeCycle.js';
 import SpecimenForm from './specimenForm.js';
 import {ActionButton} from './barcodePage';
 
@@ -11,7 +11,7 @@ import {BarcodePathDisplay} from './barcodePage.js';
 import swal from 'sweetalert2';
 
 function Header(props) {
-  const {options, data, clearAll, increaseCoordinate, editable, current, edit} = props;
+  const {options, data, clearAll, increaseCoordinate, current} = props;
   const {printLabel} = props;
   const {specimen, setSpecimen, createSpecimens} = props;
 
@@ -23,14 +23,9 @@ function Header(props) {
     if (status == 'Available' &&
         specimen.quantity > 0 &&
         !specimen.poolId) {
-      const openAliquotForm = () => edit('aliquotForm');
-      return (
-        <div className='action-button add' onClick={openAliquotForm}>
-          +
-        </div>
-      );
+      return <ActionButton icon='plus' onClick={openAliquotForm}/>;
     } else {
-      return <div className='action-button disabled'>+</div>;
+      return <ActionButton icon='plus' disabled={true}/>;
     }
   };
   const addAliquotForm = () => {
@@ -47,7 +42,6 @@ function Header(props) {
             data={data}
             current={current}
             increaseCoordinate={increaseCoordinate}
-            show={editable.aliquotForm}
             onClose={clearAll}
             setSpecimen={setSpecimen}
             onSubmit={createSpecimens}
@@ -88,10 +82,6 @@ function Header(props) {
           container={container}
         />
       </div>
-      <LifeCycle
-        specimen={specimen}
-        centers={options.centers}
-      />
     </div>
   );
 }

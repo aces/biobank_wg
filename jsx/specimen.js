@@ -1,8 +1,8 @@
-import React from 'react';
-import PropTypes from 'prop-types';
+import React, {useState} from 'react';
 import SpecimenProcessForm from './processForm';
+import {ActionButton} from './barcodePage';
 
-import {clone} from './helpers.js';
+import {useSpecimen} from './Specimen';
 
 /**
  * Biobank Specimen
@@ -11,74 +11,58 @@ import {clone} from './helpers.js';
  * @return {*}
  */
 function BiobankSpecimen(props) {
-  const {current, editable, errors, options, specimen, container} = props;
-
-  const addProcess = async (process) => {
-    const newSpecimen = clone(specimen);
-    newSpecimen[process] = {centerId: container.centerId};
-    await props.editSpecimen(newSpecimen);
-    props.edit(process);
-  };
-
-  const alterProcess = (process) => {
-    props.editSpecimen(specimen)
-    .then(() => props.edit(process));
-  };
+  const {options, specimen} = props;
 
   return (
-    <div className="processing">
-      <Processes
-        addProcess={addProcess}
-        alterProcess={alterProcess}
+    <>
+      <ProcessPanel
+        process='collection'
         specimen={specimen}
-        editable={editable}
-        clearAll={props.clearAll}
-        current={current}
-        errors={errors}
         options={options}
-        setCurrent={props.setCurrent}
-        setSpecimen={props.setSpecimen}
-        updateSpecimen={props.updateSpecimen}
-      >
-        <ProcessPanel process='collection'/>
-        <ProcessPanel process='preparation'/>
-        <ProcessPanel process='analysis'/>
-      </Processes>
-    </div>
+      />
+      <ProcessPanel
+        process='preparation'
+        specimen={specimen}
+        options={options}
+      />
+      <ProcessPanel
+        process='analysis'
+        specimen={specimen}
+        options={options}
+      />
+    </>
   );
 }
 
-BiobankSpecimen.propTypes = {
-  specimenPageDataURL: PropTypes.string.isRequired,
-};
-
-function Processes(props) {
-  return React.Children.map(props.children, (child) => {
-    return React.cloneElement(child, {...props});
-  });
-}
-
 function ProcessPanel(props) {
-  const {editable, process, current, specimen, options} = props;
+  const {process, options} = props;
+  const [editable, setEditable] = useState(false);
+
+  console.log(props.specimen);
+  const specHand = new useSpecimen(props.specimen);
+  const specimen = specHand.getSpecimen();
+
+  const edit = () => setEditable(true);
+  const clear = () => specHand.clear().then(setEditable(false));
 
   const alterProcess = () => {
     if (loris.userHasPermission('biobank_specimen_alter')) {
       return (
         <span
-          className={editable[process] ? null : 'glyphicon glyphicon-pencil'}
-          onClick={editable[process] ? null : () => props.alterProcess(process)}
+          className={!editable && 'glyphicon glyphicon-pencil'}
+          onClick={editable && edit}
         />
       );
     }
   };
 
   const cancelAlterProcess = () => {
-    if (editable[process]) {
+    if (editable) {
       return (
         <a
           className="pull-right"
           style={{cursor: 'pointer'}}
-          onClick={props.clearAll}
+          onClick={clear}
         >
           Cancel
         </a>
@@ -97,14 +81,12 @@ function ProcessPanel(props) {
   let panel = null;
   if (protocolExists &&
       !specimen[process] &&
-      !editable[process] &&
+      !editable &&
       loris.userHasPermission('biobank_specimen_update')) {
-    const addProcess = () => props.addProcess(process);
+    const addProcess = () => specHand.addProcess(process);
     panel = (
       <div className='panel specimen-panel inactive'>
-        <div className='add-process' onClick={addProcess}>
-          <span className='glyphicon glyphicon-plus'/>
-        </div>
+        <ActionButton onClick={addProcess} icon={'add'}/>
         <div>ADD {process.toUpperCase()}</div>
       </div>
     );
@@ -113,26 +95,14 @@ function ProcessPanel(props) {
   const form = (
     <FormElement>
       <SpecimenProcessForm
-        current={current}
-        errors={props.errors.specimen[process]}
-        edit={editable[process]}
-        specimen={current.specimen}
+        specimen={specimen}
         options={options}
-        process={
-          editable[process] ?
-          current.specimen[process] :
-          specimen[process]
-        }
         processStage={process}
-        setCurrent={props.setCurrent}
-        setParent={props.setSpecimen}
-        typeId={editable[process] ? current.specimen.typeId : specimen.typeId}
-        updateSpecimen={props.updateSpecimen}
       />
     </FormElement>
   );
 
-  if (specimen[process] || editable[process]) {
+  if (specimen[process] || editable) {
     panel = (
       <div className='panel specimen-panel panel-default'>
         <div className='panel-heading'>

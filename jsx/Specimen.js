@@ -4,8 +4,13 @@ import {get, post} from './helpers.js';
 export function useSpecimen(initSpecimen = {}) {
   const [specimen, setSpecimen] = useState(new Specimen(initSpecimen));
   const [errors, setErrors] = useState({});
+  console.log(specimen);
 
   this.set = (name, value) => setSpecimen(specimen.set(name, value));
+  this.addProcess = (process) => specimen.addProcess(process);
+  this.setProcess = (name, value, process) => {
+    specimen.set(process, setProcess(name, value, specimen[process]));
+  };
   this.put = () => post(specimen, `${loris.BaseURL}/biobank/specimens/`, 'PUT')
     .catch((e) => Promise.reject(setErrors(e)));
   this.remove = (name) => setSpecimen(specimen.remove(name));
@@ -32,9 +37,9 @@ class Specimen {
     this.candidateAge = props.candidateAge || null;
     this.sessionId = props.sessionId || null;
     this.poolId = props.poolId || null;
-    this.collection = props.collection || [];
-    this.preparation = props.preparation || [];
-    this.analysis = props.analysis || [];
+    this.collection = props.collection || new Process();
+    this.preparation = props.preparation || null;
+    this.analysis = props.analysis || null;
   }
 
   set(name, value) {
@@ -57,6 +62,16 @@ class Specimen {
     return new Specimen({name, ...this});
   }
 
+  addProcess(process) {
+    // TODO: When adding a new preparation, the centerId shold be set to the current
+    // container center!!!
+    return set(process, new Process({centerId: 1}));
+  }
+
+  setProcess(name, value, process) {
+    return new Process({...process, [name]: value});
+  }
+
   put() {
     console.log('trying to put!!');
     console.log(this);
@@ -73,5 +88,22 @@ class Specimen {
     return await post(this, `${loris.BaseURL}/biobank/specimens/`, 'POST');
   }
 }
+
+class Process {
+  constructor(props = {}) {
+    this.id = props.id || null;
+    this.protocolId = props.protocolId || null;
+    this.centerId = props.centerId || null;
+    this.examinerId = props.examinerId || null;
+    this.date = props.date || null;
+    this.time = props.time || null;
+    this.comments = props.comments || null;
+    this.data = props.data || {};
+  }
+
+  set(name, value) {
+    return new Specimen({...this, [name]: value});
+  }
+};
 
 export default Specimen;

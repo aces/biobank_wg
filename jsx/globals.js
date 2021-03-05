@@ -7,7 +7,7 @@ import {useSpecimen} from './Specimen.js';
 import {ActionButton} from './barcodePage';
 
 import TriggerableModal from 'TriggerableModal';
-import Loader from 'Loader';
+import {Saving} from 'Loader';
 import ContainerParentForm from './containerParentForm';
 
 /**
@@ -40,7 +40,6 @@ function Globals(props) {
     <InlineForm
       label={'Container Type'}
       updateValue={updateContainerType}
-      pencil={true}
       value={options.container.types[container.typeId].label}
     >
       <SelectElement
@@ -63,7 +62,7 @@ function Globals(props) {
   const units = specimen.quantity && mapFormOptions(
     options.specimen.typeUnits[specimen.typeId], 'label'
   );
-  const quantityField = specimen && (
+  const quantityField = specimen.quantity && (
     <InlineForm
       label='Quantity'
       updateValue={specHand.put}
@@ -235,7 +234,7 @@ function Globals(props) {
   };
 
   const candidateSessionField = specimen.candidateId && (
-    <div>
+    <>
       <InlineForm
         label='PSCID'
         value={options.candidates[specimen.candidateId].pscid}
@@ -250,7 +249,7 @@ function Globals(props) {
             specimen.sessionId
         }
       />
-    </div>
+    </>
   );
 
   const style = {
@@ -271,7 +270,6 @@ function Globals(props) {
         label={'Lot Number'}
         updateValue={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
         value={container.lotNumber}
-        pencil={true}
       >
         <TextboxElement
           name='lotNumber'
@@ -284,7 +282,6 @@ function Globals(props) {
         label={'Expiration Date'}
         updateValue={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
         value={container.expirationDate}
-        pencil={true}
       >
         <DateElement
           name='expirationDate'
@@ -304,30 +301,8 @@ function Globals(props) {
   );
 }
 
-/**
- * Item
- *
- * @param {object} props
- * @return {*}
- **/
-function Item({children}) {
-  const style = {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: 'auto 0',
-  };
-  return <div style={style}>{children}</div>;
-}
-
-/**
- * Inline Field
- *
- * @param {object} props
- * @return {*}
- **/
 function InlineForm(props) {
-  const {children, label, pencil, updateValue, link, value, subValue} = props;
+  const {children, label, updateValue, link, value, subValue} = props;
   const [loading, setLoading] = useState(false);
   const [editable, setEditable] = useState(false);
 
@@ -338,93 +313,73 @@ function InlineForm(props) {
     setLoading(false);
   };
 
-  const fields = React.Children.map(children, (child) => {
-    return (
-      <div style={{flex: '1 0 25%', minWidth: '90px'}}>
-        {React.cloneElement(child, {inputClass: 'col-lg-11'})}
-      </div>
-    );
-  });
-
-  const editButton = !editable && updateValue instanceof Function && (
-    <ActionButton title={'Update '+label} onClick={() => setEditable(true)}/>
-  );
-
-  // pencil ? glyphicon glyphicon-pencil : regularAction
-
-  const loader = loading && (
+  const submitButton = !loading ? (
     <>
-      <div style={{flex: '0 1 15%', margin: '0 1%'}}>
-        <Loader size={20}/>
-      </div>
-      <div style={{flex: '0 1 15%', margin: '0 1%'}}>
-        <h5 className='animate-flicker'>Saving...</h5>
-      </div>
-    </>
-  );
-
-  const submitButton = !loading && (
-    <>
-      <div style={{flex: '0 1 15%', margin: '0 1%'}}>
+      <div style={{margin: '0 1%'}}>
         <ButtonElement
           label="Update"
           onUserInput={update}
           columnSize= 'col-xs-11'
         />
       </div>
-      <div style={{flex: '0 1 15%', margin: '0 1%'}}>
+      <div style={{margin: '0 1%'}}>
         <a onClick={()=>setEditable(false)} style={{cursor: 'pointer'}}>
           Cancel
         </a>
       </div>
     </>
+  ) : <Saving loading={loading}/>;
+
+  const editButton = updateValue instanceof Function && (
+    <div><ActionButton title={'Update '+label} onClick={() => setEditable(true)}/></div>
   );
 
-  const linkValue = link ? (
-    <a href={link}>{value}</a>
-  ) : value;
+  const staticField = (
+    <InlineField>
+      <Value link={link} value={value}/>
+      {subValue}
+      {editButton}
+    </InlineField>
+  );
 
-  const fieldStyle = {
-    flexGrow: 1,
-  };
+  const fields = React.Children.map(children, (child) => {
+    return (
+      <div style={{flex: '1', minWidth: '90px'}}>
+        {React.cloneElement(child, {inputClass: 'col-lg-11'})}
+      </div>
+    );
+  });
 
-  const inlineFieldStyle = {
+  const dynamicField = (
+    <InlineField>
+      {fields}
+      {submitButton}
+    </InlineField>
+  );
+
+  return <>{label}{editable ? dynamicField : staticField}</>;
+}
+
+function InlineField({children}) {
+  const style = {
     display: 'flex',
-    flexWrap: 'wrap',
     flexDirection: 'row',
     alignItems: 'center',
+    margin: 'auto 0',
+    flexWrap: 'wrap',
   };
+  return <div style={style}>{children}</div>;
+}
 
-  const valueStyle = {
+function Value({value = '—', link}) {
+  // XXX: default param not working for some reason
+  value = value || '—';
+  const style = {
     fontSize: '22px',
+    flex: 1,
   };
-
-  const renderField = editable ? (
-    <div style={fieldStyle}>
-      {label}
-      <div style={inlineFieldStyle}>
-        {fields}
-        {submitButton}
-        {loader}
-      </div>
-    </div>
-  ) : (
-    <div style={fieldStyle}>
-      {label}
-      {pencil && editButton}
-      <div style={valueStyle}>
-        {linkValue || '—'}
-      </div>
-      {subValue}
-    </div>
-  );
-
-  return (
-    <Item>
-      {renderField}
-      {!pencil && editButton}
-    </Item>
-  );
+  const formattedValue = link ? <a href={link}>{value}</a> : value;
+  return <div style={style}>{formattedValue}</div>;
 }
 
 export default Globals;

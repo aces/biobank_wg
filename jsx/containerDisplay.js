@@ -6,13 +6,35 @@ import {ActionButton} from './barcodePage.js';
 import {BarcodePathDisplay} from './barcodePage';
 
 function ContainerDisplay(props) {
-  const {barcodes, coordinates, current, data, editable, options} = props;
+  const {data, options} = props;
   const {history, select, container, selectedCoordinate} = props;
   const {clearAll, editContainer, setContainer, updateContainer, setCurrent, setCheckoutList, edit} = props;
+
+  // TODO: These are place holders!!!!
+  const current = {};
+  const editable = {};
 
   useEffect(() => {
     $('[data-toggle="tooltip"]').tooltip();
   });
+
+  // const parentContainers = <Suspense fallBack={[]} callBack={container.getParentContainers}/>;
+  const barcodes = mapFormOptions(data.containers, 'barcode');
+  // console.log(parentContainers);
+  // delete values that are parents of the container
+  // parentContainers
+  //   .forEach((container) => Object.keys(barcodes)
+  //     .forEach((i) => (container.barcode == barcodes[i]) && delete barcodes[i])
+  // );
+
+  const coordinates = data.containers[container.id].childContainerIds
+    .reduce((result, id) => {
+      const container = data.containers[id];
+      if (container.coordinate) {
+        result[container.coordinate] = id;
+      }
+      return result;
+    }, {});
 
   const dimension = container.dimension;
 
@@ -197,6 +219,12 @@ function ContainerDisplay(props) {
     </div>
 
   );
+
+
+  // TODO: THIS NEED TO BE CONVERTED TO STATES?
+  current.list = {};
+  current.prevCoordinate = null;
+  current.coordinate = null;
 
   // TODO: This will eventually need to be reworked and cleaned up
   let display;

@@ -1,103 +1,79 @@
 import React, {useState, useEffect} from 'react';
 import {Link} from 'react-router-dom';
 
-import {mapFormOptions, clone, isEmpty} from './helpers.js';
-
 import {Panels} from 'Panel';
 import Globals from './globals';
 import Header from './header';
-// import BiobankSpecimen from './specimen';
+import BiobankSpecimen from './specimen';
 import ContainerDisplay from './containerDisplay';
-import LoadingBar from 'jsx/LoadingBar';
 import Loader from 'Loader';
 
 import Container from './Container.js';
 
 function BarcodePage(props) {
-    const {data, options, edit, history} = props;
-    const {specimen} = props;
+  const {data, options, edit, history} = props;
+  const {specimen} = props;
 
-    if (!props.container) {
-      return <Loader/>;
-    }
-
-    const container = new Container(props.container);
-
-
-    // const parentContainers = <Suspense fallBack={[]} callBack={container.getParentContainers}/>;
-    const barcodes = mapFormOptions(data.containers, 'barcode');
-    // console.log(parentContainers);
-    // delete values that are parents of the container
-    // parentContainers
-    //   .forEach((container) => Object.keys(barcodes)
-    //     .forEach((i) => (container.barcode == barcodes[i]) && delete barcodes[i])
-    // );
-
-    const coordinates = data.containers[container.id].childContainerIds
-      .reduce((result, id) => {
-        const container = data.containers[id];
-        if (container.coordinate) {
-          result[container.coordinate] = id;
-        }
-        return result;
-      }, {});
-
-    // const renderMain = this.props.specimen && (
-    //   <BiobankSpecimen
-    //     specimen={specimen}
-    //     container={container}
-    //     options={options}
-    //     current={current}
-    //     editable={editable}
-    //     setCurrent={this.setCurrent}
-    //     edit={this.edit}
-    //     clearAll={this.clearAll}
-    //     setSpecimen={this.setSpecimen}
-    //     editSpecimen={this.editSpecimen}
-    //   />
-    // );
-
-    return (
-      <>
-        <Header
-          data={data}
-          current={current}
-          editable={editable}
-          options={options}
-          edit={edit}
-          specimen={specimen}
-          container={container}
-          createSpecimens={this.props.createSpecimens}
-          increaseCoordinate={props.increaseCoordinate}
-          printLabel={props.printLabel}
-        />
-        <Panels grow={[1, 2, 1]}>
-          <Globals
-            current={current}
-            data={data}
-            options={options}
-            specimen={specimen}
-            container={container}
-          />
-          <ContainerDisplay
-            history={history}
-            data={data}
-            container={container}
-            barcodes={barcodes}
-            current={current}
-            options={options}
-            coordinates={coordinates}
-            editable={editable}
-            edit={edit}
-          />
-          <ContainerList
-            container={container}
-            data={data}
-          />
-        </Panels>
-      </>
-    );
+  if (!props.container) {
+    return <Loader/>;
   }
+
+  if (!specimen) {
+    return <Loader/>;
+  }
+
+  const container = new Container(props.container);
+  console.log(specimen);
+
+  const renderMain = specimen ? (
+    <Panels height={700} grow={[1, 2]}>
+      <Globals
+        data={data}
+        options={options}
+        specimen={specimen}
+        container={container}
+      />
+      <BiobankSpecimen
+        specimen={specimen}
+        options={options}
+      />
+    </Panels>
+  ) : (
+    <Panels height={700} grow={[1, 2, 1]}>
+      <Globals
+        data={data}
+        options={options}
+        specimen={specimen}
+        container={container}
+      />
+      <ContainerDisplay
+        history={history}
+        data={data}
+        container={container}
+        options={options}
+      />
+      <ContainerList
+        container={container}
+        data={data}
+      />
+    </Panels>
+  );
+
+  return (
+    <>
+      <Header
+        data={data}
+        options={options}
+        edit={edit}
+        specimen={specimen}
+        container={container}
+        createSpecimens={props.createSpecimens}
+        increaseCoordinate={props.increaseCoordinate}
+        printLabel={props.printLabel}
+      />
+      {renderMain}
+    </>
+  );
 }
 
 function ContainerList({container, data = {}}) {
