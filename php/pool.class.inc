@@ -39,32 +39,43 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
      * @var string    $id
      * @var string    $label
      * @var float     $quantity
-     * @var int       $unitId
+     * @var string    $unit
      * @var array     $specimenIds
      * @var int       $candidateId
      * @var int       $sessionId
      * @var int       $typeId
-     * @var int       $centerId
+     * @var string    $center
      * @var \DateTime $date
      * @var \DateTime $time
      */
     private $id;
     private $label;
     private $quantity;
-    private $unitId;
+    private $unit;
     private $specimenIds;
     private $candidateId;
     private $sessionId;
     private $typeId;
-    private $centerId;
+    private $center;
     private $date;
     private $time;
 
     /**
      * Initiliazes a new instance of the Pool Class
      */
-    function __construct()
+    function __construct($data)
     {
+        $this->setId((int) ($data['id']));                                              
+        $this->setLabel((string) $data['label']);                                        
+        $this->setQuantity((float) $data['quantity']);                            
+        $this->setUnit((string) $data['unit']);                            
+        $this->setSpecimenIds($data['specimenIds']);                            
+        $this->setCandidateId((int) $data['candidateId']);                            
+        $this->setSessionId((int) $data['sessionId']);                                
+        $this->setTypeId((int) $data['typeId']);                                
+        $this->setCenter((string) $data['center']);                                  
+        $this->setDate(new \DateTime($data['date']));                           
+        $this->setTime(new \DateTime($data['time']));                           
     }
 
     /**
@@ -76,9 +87,7 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     public function setId(int $id) : void
     {
-        if ($id > 0) {
-            $this->id = $id;
-        }
+        $this->id = $id;
     }
 
     /**
@@ -136,27 +145,25 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
     }
 
     /**
-     * Sets the Unit ID of the pool
+     * Sets the Unit of the pool
      *
-     * @param int $unitId Unit ID of the pool
+     * @param int $unit Unit of the pool
      *
      * @return void
      */
-    public function setUnitId(int $unitId) : void
+    public function setUnit(string $unit) : void
     {
-        if ($unitId > 0) {
-            $this->unitId = $unitId;
-        }
+        $this->unit = $unit;
     }
 
     /**
-     * Gets the Unit ID of the pool
+     * Gets the Unit of the pool
      *
-     * @return ?int
+     * @return string
      */
-    public function getUnitId() : ?int
+    public function getUnit() : string
     {
-        return $this->unitId;
+        return $this->unit;
     }
 
     /**
@@ -190,9 +197,7 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     public function setCandidateId(int $candidateId) : void
     {
-        if ($candidateId > 0) {
-            $this->candidateId = $candidateId;
-        }
+        $this->candidateId = $candidateId;
     }
 
     /**
@@ -214,9 +219,7 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     public function setSessionId(?int $sessionId) : void
     {
-        if ($sessionId > 0) {
-            $this->sessionId = $sessionId;
-        }
+        $this->sessionId = $sessionId;
     }
 
     /**
@@ -238,9 +241,7 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     public function setTypeId(?int $typeId) : void
     {
-        if ($typeId > 0) {
-            $this->typeId = $typeId;
-        }
+        $this->typeId = $typeId;
     }
 
     /**
@@ -254,27 +255,25 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
     }
 
     /**
-     * Sets the Center ID of the pool
+     * Sets the Center of the pool
      *
-     * @param array $centerId Center ID of the pool
+     * @param array $center Center of the pool
      *
      * @return void
      */
-    public function setCenterId(int $centerId) : void
+    public function setCenter(string $center) : void
     {
-        if ($centerId > 0) {
-            $this->centerId = $centerId;
-        }
+         $this->center = $center;
     }
 
     /**
-     * Gets the Center ID of the pool
+     * Gets the Center of the pool
      *
-     * @return int
+     * @return string
      */
-    public function getCenterId() : int
+    public function getCenter() : int
     {
-        return $this->centerId;
+        return $this->center;
     }
 
     /**
@@ -322,30 +321,6 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
     }
                                                                                 
     /**                                                                         
-     * Loads a Pool Object from an array.
-     *                                                                          
-     * @param array $data Data to be used to load the Pool Object.             
-     *                                                                          
-     * @return Pool                             
-     */                                                                         
-    public function fromArray(array $data) : Pool                    
-    {                                                                           
-        isset($data['id'])          && $this->setId((int) ($data['id']));                                              
-        isset($data['label'])       && $this->setLabel((string) $data['label']);                                        
-        isset($data['quantity'])    && $this->setQuantity((float) $data['quantity']);                            
-        isset($data['unitId'])      && $this->setUnitId((int) $data['unitId']);                            
-        isset($data['specimenIds']) && $this->setSpecimenIds($data['specimenIds']);                            
-        isset($data['candidateId']) && $this->setCandidateId((int) $data['candidateId']);                            
-        isset($data['sessionId'])   && $this->setSessionId((int) $data['sessionId']);                                
-        isset($data['typeId'])      && $this->setTypeId((int) $data['typeId']);                                
-        isset($data['centerId'])    && $this->setCenterId((int) $data['centerId']);                                  
-        isset($data['date'])        && $this->setDate(new \DateTime($data['date']));                           
-        isset($data['time'])        && $this->setTime(new \DateTime($data['time']));                           
-                                                                                
-        return $this;                                                           
-    }                                                                           
-                                                                                
-    /**                                                                         
      * A wrapper function for the jsonSerialize method of the Pool Instance 
      * Class. This converts the Pool Instance into an array.                
      *                                                                          
@@ -369,12 +344,12 @@ class Pool implements \JsonSerializable, \LORIS\Data\DataInstance
                 'id'          => $this->id,
                 'label'       => $this->label,
                 'quantity'    => $this->quantity,
-                'unitId'      => $this->unitId,
+                'unit'        => $this->unit,
                 'specimenIds' => $this->specimenIds,
                 'candidateId' => $this->candidateId,
                 'sessionId'   => $this->sessionId,
                 'typeId'      => $this->typeId,
-                'centerId'    => $this->centerId,
+                'center'      => $this->center,
                 'date'        => $this->date->format('d-m-Y'),
                 'time'        => $this->time->format('H:i'),
                );

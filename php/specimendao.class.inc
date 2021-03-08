@@ -379,7 +379,6 @@ class SpecimenDAO extends \LORIS\Data\ProvisionerInstance
             foreach ($row as $value) {
                 $pA[$row['protocolId']][$row['attributeId']]['label']           = $row['label'];
                 $pA[$row['protocolId']][$row['attributeId']]['datatypeId']      = $row['datatypeId'];
-                $pA[$row['protocolId']][$row['attributeId']]['refTableId']      = $row['refTableId'];
                 $pA[$row['protocolId']][$row['attributeId']]['required']        = (int) $row['required'];
                 $pA[$row['protocolId']][$row['attributeId']]['showInDataTable'] = (int) $row['showInDataTable'];
             }
@@ -514,6 +513,19 @@ class SpecimenDAO extends \LORIS\Data\ProvisionerInstance
         }
 
         return $this->getInstanceFromId($specimen->getId());
+    }
+
+    private function deleteInstance() {
+      "SELECT ContainerID FROM biobank_container WHERE Barcode=";
+      "SELECT SpecimenID FROM biobank_specimen WHERE ContainerID=";
+      "DELETE FROM biobank_specimen_analysis WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen_preparation WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen_collection WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen_parent WHERE SpecimenID=";
+      "DELETE FROM biobank_specimen WHERE SpecimenID=";
+
+      "DELETE FROM biobank_container_parent WHERE ContainerID=";
+      "DELETE FROM biobank_container WHERE ContainerID=";
     }
 
     /**

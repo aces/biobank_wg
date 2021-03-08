@@ -144,7 +144,6 @@ class ContainerController
                 'types'           => $this->dao->getTypes(),
                 'typesPrimary'    => $this->dao->getTypes(['Primary' => 1]),
                 'typesNonPrimary' => $this->dao->getTypes(['Primary' => 0]),
-                'dimensions'      => $this->dao->getDimensions(),
                 'stati'           => $this->dao->getStati(),
                );
     }
@@ -212,7 +211,7 @@ class ContainerController
         $this->validateTemperature($container);
         $this->validateStatusId($container);
         $this->validateProjectIds($container);
-        $this->validateCenterId($container);
+        $this->validateCenter($container);
         $this->validateParentContainerId($container);
         $this->validateCoordinate($container);
         $this->validateLotNumber($container);
@@ -414,7 +413,7 @@ class ContainerController
     }
 
     /**
-     * Validates Container Object Center ID.
+     * Validates Container Object Center.
      *
      * @param Container $container Container to be checked.
      *
@@ -422,7 +421,7 @@ class ContainerController
      *
      * @return void
      */
-    private function validateCenterId(Container $container) : void
+    private function validateCenter(Container $container) : void
     {
         if (is_null($container->getCenterId())) {
             throw new \BadRequest("Center value must be set.");
@@ -431,7 +430,7 @@ class ContainerController
         $parentContainerId = $container->getParentContainerId();
         if (false) {
             $parentContainer = $this->dao->getInstanceFromId($parentContainerId);
-            if ($container->getCenterID() !== $parentContainer->getCenterID()) {
+            if ($container->getCenterId() !== $parentContainer->getCenterId()) {
                 $barcode = $container->getBarcode();
                 throw new \BadRequest(
                         $container->getBarcode()." must be at the same location 
@@ -490,7 +489,7 @@ class ContainerController
             }
 
             $parentContainer = $this->dao->getInstanceFromId($parentContainerId); 
-            $dimensions      = $this->dao->getDimensions()[$parentContainer->getDimensionId()];
+            $dimensions      = $this->dao->getDimensions($parentContainer->getDimensionId());
             $capacity        = $dimensions['x'] * $dimensions['y'] * $dimensions['z'];
             if ($container->getCoordinate() > $capacity) {
                throw new \BadRequest(

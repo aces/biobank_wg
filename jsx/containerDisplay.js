@@ -1,23 +1,42 @@
 import {useEffect} from 'react';
 import swal from 'sweetalert2';
 import {mapFormOptions} from './helpers.js';
+import {ActionButton} from './barcodePage.js';
 
-/**
- * ContainerDisplay
- *
- * @author Henri Rabalais
- * @version 1.0.0
- *
- **/
+import {BarcodePathDisplay} from './barcodePage';
 
 function ContainerDisplay(props) {
-  const {barcodes, coordinates, current, data, dimensions, editable, options} = props;
+  const {data, options} = props;
   const {history, select, container, selectedCoordinate} = props;
   const {clearAll, editContainer, setContainer, updateContainer, setCurrent, setCheckoutList, edit} = props;
+
+  // TODO: These are place holders!!!!
+  const current = {};
+  const editable = {};
 
   useEffect(() => {
     $('[data-toggle="tooltip"]').tooltip();
   });
+
+  // const parentContainers = <Suspense fallBack={[]} callBack={container.getParentContainers}/>;
+  const barcodes = mapFormOptions(data.containers, 'barcode');
+  // console.log(parentContainers);
+  // delete values that are parents of the container
+  // parentContainers
+  //   .forEach((container) => Object.keys(barcodes)
+  //     .forEach((i) => (container.barcode == barcodes[i]) && delete barcodes[i])
+  // );
+
+  const coordinates = data.containers[container.id].childContainerIds
+    .reduce((result, id) => {
+      const container = data.containers[id];
+      if (container.coordinate) {
+        result[container.coordinate] = id;
+      }
+      return result;
+    }, {});
+
+  const dimension = container.dimension;
 
   const redirectURL = (e) => {
     let coordinate = e.target.id;
@@ -46,7 +65,7 @@ function ContainerDisplay(props) {
   };
 
   const increaseCoordinate = (coordinate) => {
-    const capacity = dimensions.x * dimensions.y * dimensions.z;
+    const capacity = dimension.x * dimension.y * dimension.z;
     coordinate++;
     Object.keys(coordinates).forEach((c) => {
       if (coordinate > capacity) {
@@ -156,6 +175,15 @@ function ContainerDisplay(props) {
     // Only children of the current container can be checked out.
     let barcodes = mapFormOptions(children, 'barcode');
 
+    // setCheckoutList(container) {
+    //   // Clear current container field.
+    //   this.setCurrent('containerId', 1)
+    //     .then(()=>this.setCurrent('containerId', null));
+    //   const list = this.state.current.list;
+    //   list[container.coordinate] = container;
+    //   this.setCurrent('list', list);
+    // }
+
     barcodeField = (
       <SearchableDropdown
         name='barcode'
@@ -192,16 +220,22 @@ function ContainerDisplay(props) {
 
   );
 
+
+  // TODO: THIS NEED TO BE CONVERTED TO STATES?
+  current.list = {};
+  current.prevCoordinate = null;
+  current.coordinate = null;
+
   // TODO: This will eventually need to be reworked and cleaned up
   let display;
   let column = [];
   let row = [];
   let coordinate = 1;
-  if (dimensions) {
-    for (let y=1; y <= dimensions.y; y++) {
+  if (dimension) {
+    for (let y=1; y <= dimension.y; y++) {
       column = [];
-      for (let x=1; x <= dimensions.x; x++) {
-        let nodeWidth = (500/dimensions.x) - (500/dimensions.x * 0.08);
+      for (let x=1; x <= dimension.x; x++) {
+        let nodeWidth = (500/dimension.x) - (500/dimension.x * 0.08);
         let nodeStyle = {width: nodeWidth};
         let nodeClass = 'node';
         let tooltipTitle = null;
@@ -306,11 +340,11 @@ function ContainerDisplay(props) {
         }
 
         let coordinateDisplay;
-        if (dimensions.xNum == 1 && dimensions.yNum == 1) {
-          coordinateDisplay = x + (dimensions.x * (y-1));
+        if (dimension.xNum == 1 && dimension.yNum == 1) {
+          coordinateDisplay = x + (dimension.x * (y-1));
         } else {
-          const xVal = dimensions.xNum == 1 ? x : String.fromCharCode(64+x);
-          const yVal = dimensions.yNum == 1 ? y : String.fromCharCode(64+y);
+          const xVal = dimension.xNum == 1 ? x : String.fromCharCode(64+x);
+          const yVal = dimension.yNum == 1 ? y : String.fromCharCode(64+y);
           coordinateDisplay = yVal+''+xVal;
         }
 
@@ -338,8 +372,8 @@ function ContainerDisplay(props) {
         coordinate++;
       }
 
-      let rowHeight = (500/dimensions.y) - (500/dimensions.y * 0.08);
-      // let rowMargin = (500/dimensions.y * 0.04);
+      let rowHeight = (500/dimension.y) - (500/dimension.y * 0.08);
+      // let rowMargin = (500/dimension.y * 0.04);
       let rowStyle = {height: rowHeight};
 
       row.push(
@@ -350,15 +384,40 @@ function ContainerDisplay(props) {
     display = row;
   }
 
+  const style = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    height: '100%',
+  };
+
+  const checkoutButton = () => {
+    if (!(loris.userHasPermission('biobank_container_update')) ||
+        (data.containers[container.id].childContainerIds.length == 0)) {
+      return;
+    }
+
+    return (
+      <ActionButton
+        title={'Checkout Child Containers'}
+        onClick={() => edit('containerCheckout')}
+        icon={'share'}
+      />
+    );
+  };
+
   return (
-    <div>
-      <div style={{width: 500}}>
+    <div style={style}>
+      <div>
+        {checkoutButton()}
         {checkout}
         {load}
       </div>
       <div className='display'>
         {display}
       </div>
+      <BarcodePathDisplay container={container}/>
     </div>
   );
 }

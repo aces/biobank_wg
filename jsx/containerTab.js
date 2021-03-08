@@ -35,8 +35,6 @@ class ContainerTab extends Component {
         return this.props.options.container.stati[value].label;
       case 'Projects':
         return value.map((id) => this.props.options.projects[id]);
-      case 'Site':
-        return this.props.options.centers[value];
       case 'Parent Barcode':
         return (value && this.props.data.containers[value].barcode);
       default:
@@ -76,20 +74,21 @@ class ContainerTab extends Component {
   }
 
   render() {
+    const {options} = this.props;
     const {editable} = this.state;
 
     const stati = mapFormOptions(
-      this.props.options.container.stati, 'label'
+      options.container.stati, 'label'
     );
     const containerTypesNonPrimary = mapFormOptions(
-      this.props.options.container.typesNonPrimary, 'label'
+      options.container.typesNonPrimary, 'label'
     );
     const containersNonPrimary = Object.values(this.props.data.containers)
       .reduce((result, container) => {
         // TODO: this check is necessary or else the page will go blank when the
         // first specimen is added.
         if (container) {
-          if (this.props.options.container.types[container.typeId].primary == 0) {
+          if (options.container.types[container.typeId].primary == 0) {
             result[container.id] = container;
           }
           return result;
@@ -106,7 +105,7 @@ class ContainerTab extends Component {
           container.typeId,
           container.statusId,
           container.projectIds,
-          container.centerId,
+          options.centers[container.centerId],
           container.parentContainerId,
         ];
       }
@@ -129,9 +128,9 @@ class ContainerTab extends Component {
       }},
       {label: 'Projects', show: true},
       {label: 'Site', show: true, filter: {
-        name: 'currentSite',
+        name: 'site',
         type: 'select',
-        options: this.props.options.centers,
+        options: options.centers,
       }},
       {label: 'Parent Barcode', show: true, filter: {
         name: 'parentBarcode',
@@ -166,7 +165,7 @@ class ContainerTab extends Component {
         />
         {loris.userHasPermission('biobank_container_create') ?
         <ContainerForm
-          options={this.props.options}
+          options={options}
           show={editable.containerForm}
           onClose={this.clearEditable}
           onSubmit={this.props.createContainers}

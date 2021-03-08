@@ -28,7 +28,7 @@ use \Psr\Http\Message\ResponseInterface;
  * @license    http://www.gnu.org/licenses/gpl-3.0.text GPLv3
  * @link       http://www.github.com/aces/Loris/
  */
-class ContainerEndpoint implements RequestHandlerInterface
+class Containers implements RequestHandlerInterface
 {
     /**
      * Returns true if user has access to this endpoint.
@@ -87,12 +87,20 @@ class ContainerEndpoint implements RequestHandlerInterface
         $db       = \Database::singleton();
         $user     = $request->getAttribute('user');
         $contCont = new ContainerController($db, $user);
+        $contDao = new ContainerDAO($db);
+        // $barcode = basename($request->getUri()->getPath());
+        // $pathparts = $request->getAttribute('pathparts');
+        $id = basename($request->getRequestTarget());
 
         try {
             $db->beginTransaction();
             switch($request->getMethod()) {
             case 'GET':
-                $containers = $contCont->getInstances();
+                if ($id != 'containers') {
+                    $containers = [$contDao->getInstanceFromId((int) $id)];
+                } else {
+                    $containers = $contCont->getInstances();
+                }
                 return new \LORIS\Http\Response\OK($containers);
             case 'POST':
                 $containers = json_decode($request->getBody()->getContents(), true);
@@ -108,7 +116,7 @@ class ContainerEndpoint implements RequestHandlerInterface
             }
         } catch (\BadRequest $e) {
             $db->rollBack();
-            return new \LORIS\Http\Response\BadRequest($e->getMessage());
+            return new \LORIS\Http\Response\JSONResponse($e->getMessage(), 422);
         } catch (\Forbidden $e) {
             $db->rollBack();
             return new \LORIS\Http\Response\Forbidden($e->getMessage());

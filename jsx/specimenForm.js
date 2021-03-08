@@ -224,7 +224,7 @@ class SpecimenForm extends React.Component {
                 label="Remaining Quantity"
                 onUserInput={this.props.setSpecimen}
                 required={true}
-                value={this.props.current.specimen.quantity}
+                value={null}
               />
               <SelectElement
                 name="unitId"
@@ -232,7 +232,7 @@ class SpecimenForm extends React.Component {
                 options={specimenUnits}
                 onUserInput={this.props.setSpecimen}
                 required={true}
-                value={this.props.current.specimen.unitId}
+                value={null}
                 autoSelect={true}
               />
             </div>

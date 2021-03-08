@@ -1,313 +1,217 @@
-import React, {Component} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Link} from 'react-router-dom';
 
-import {clone, isEmpty} from './helpers.js';
-
+import {Panels} from 'Panel';
 import Globals from './globals';
 import Header from './header';
 import BiobankSpecimen from './specimen';
-import BiobankContainer from './container';
-import LoadingBar from 'jsx/LoadingBar';
+import ContainerDisplay from './containerDisplay';
+import Loader from 'Loader';
 
-const initialState = {
-  loading: false,
-  current: {
-    files: {},
-    list: {},
-    coordinate: null,
-    sequential: false,
-    count: null,
-    multiplier: 1,
-    specimen: {},
-    container: {},
-  },
-  errors: {
-    container: {},
-    specimen: {},
-  },
-  editable: {
-    aliquotForm: false,
-    containerParentForm: false,
-    loadContainer: false,
-    containerCheckout: false,
-    containerType: false,
-    temperature: false,
-    quantity: false,
-    status: false,
-    center: false,
-    collection: false,
-    preparation: false,
-    analysis: false,
-  },
-};
+import Container from './Container.js';
 
-class BarcodePage extends Component {
-  constructor() {
-    super();
+function BarcodePage(props) {
+  const {data, options, edit, history} = props;
+  const {specimen} = props;
 
-    this.state = initialState;
-    this.getParentContainerBarcodes = this.getParentContainerBarcodes.bind(this);
-    this.getCoordinateLabel = this.getCoordinateLabel.bind(this);
-    this.edit = this.edit.bind(this);
-    this.clearEditable = this.clearEditable.bind(this);
-    this.clearAll = this.clearAll.bind(this);
-    this.setCheckoutList = this.setCheckoutList.bind(this);
-    this.editSpecimen = this.editSpecimen.bind(this);
-    this.editContainer = this.editContainer.bind(this);
-    this.setSpecimen = this.setSpecimen.bind(this);
-    this.setContainer = this.setContainer.bind(this);
-    this.setCurrent = this.setCurrent.bind(this);
-    this.setErrors = this.setErrors.bind(this);
-    this.getBarcodePathDisplay = this.getBarcodePathDisplay.bind(this);
+  if (!props.container) {
+    return <Loader/>;
   }
 
-  getParentContainerBarcodes(container, barcodes=[]) {
-    barcodes.push(container.barcode);
-
-    const parent = Object.values(this.props.data.containers)
-      .find((c) => container.parentContainerId == c.id);
-
-    parent && this.getParentContainerBarcodes(parent, barcodes);
-
-    return barcodes.slice(0).reverse();
+  if (!specimen) {
+    return <Loader/>;
   }
 
-  getCoordinateLabel(container) {
-    const parentContainer = this.props.data.containers[container.parentContainerId];
-    const dimensions = this.props.options.container.dimensions[parentContainer.dimensionId];
-    let coordinate;
-    let j = 1;
-    outerloop:
-    for (let y=1; y<=dimensions.y; y++) {
-      innerloop:
-      for (let x=1; x<=dimensions.x; x++) {
-        if (j == container.coordinate) {
-          if (dimensions.xNum == 1 && dimensions.yNum == 1) {
-            coordinate = x + (dimensions.x * (y-1));
-          } else {
-            const xVal = dimensions.xNum == 1 ? x : String.fromCharCode(64+x);
-            const yVal = dimensions.yNum == 1 ? y : String.fromCharCode(64+y);
-            coordinate = yVal+''+xVal;
-          }
-          break outerloop;
-        }
-        j++;
-      }
+  const container = new Container(props.container);
+  console.log(specimen);
+
+  const renderMain = specimen ? (
+    <Panels height={700} grow={[1, 2]}>
+      <Globals
+        data={data}
+        options={options}
+        specimen={specimen}
+        container={container}
+      />
+      <BiobankSpecimen
+        specimen={specimen}
+        options={options}
+      />
+    </Panels>
+  ) : (
+    <Panels height={700} grow={[1, 2, 1]}>
+      <Globals
+        data={data}
+        options={options}
+        specimen={specimen}
+        container={container}
+      />
+      <ContainerDisplay
+        history={history}
+        data={data}
+        container={container}
+        options={options}
+      />
+      <ContainerList
+        container={container}
+        data={data}
+      />
+    </Panels>
+  );
+
+  return (
+    <>
+      <Header
+        data={data}
+        options={options}
+        edit={edit}
+        specimen={specimen}
+        container={container}
+        createSpecimens={props.createSpecimens}
+        increaseCoordinate={props.increaseCoordinate}
+        printLabel={props.printLabel}
+      />
+      {renderMain}
+    </>
+  );
+}
+
+function ContainerList({container, data = {}}) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const childContainerIds = container.childContainerIds;
+
+  const getRow = async (id, i) => {
+    const child = data.containers[id];
+    if (child.coordinate) {
+      const coordinate = await new Container(child).getCoordinateLabel(container.dimension);
+      return [
+        <Link key={i} to={`/barcode=${child.barcode}`}>{child.barcode}</Link>,
+        <div>at {coordinate}</div>,
+      ];
+    } else {
+      return [
+        <Link
+          key={i}
+          to={`/barcode=${child.barcode}`}
+          id={id}
+          draggable={true}
+          onDragStart={drag}
+        >
+          {child.barcode}
+        </Link>,
+      ];
     }
-    return coordinate;
+  };
+
+  const fetchRows = async () => setRows(await Promise.all(childContainerIds.map((id) => getRow(id))));
+
+  useEffect(() => {
+    fetchRows().then(() => setLoading(false));
+  }, []);
+
+  if (!loris.userHasPermission('biobank_specimen_view')) {
+    return;
   }
 
-  edit(stateKey) {
-    return new Promise((resolve) => {
-      this.clearEditable()
-      .then(() => {
-        const editable = clone(this.state.editable);
-        editable[stateKey] = true;
-        this.setState({editable}, resolve());
-      });
-    });
+  if (!childContainerIds.length === 0) {
+    return <div className='title'>Empty!</div>;
   }
 
-  clearEditable() {
-    const state = clone(this.state);
-    state.editable = initialState.editable;
-    return new Promise((res) => this.setState(state, res()));
+  const drag = (e) => {
+    const container = JSON.stringify(data.containers[e.target.id]);
+    e.dataTransfer.setData('text/plain', container);
+  };
+
+  const listStyle = {
+    fontSize: '18px',
+    height: '100%',
+    overflowY: 'auto',
+  };
+
+  const content = loading ? <Loader/> : <List rows={rows}/>;
+
+  return <div style={listStyle}>{content}</div>;
+}
+
+function List({rows = []}) {
+  const rowStyle = {display: 'flex', flexDirection: 'row'};
+
+  const row = rows.map((row = [], i) => {
+  const valueStyle = {flex: '1', margin: '0 2%'};
+    const values = row
+      .map((value, i) => <div key={i} style={valueStyle}>{value}</div>);
+    return <div key={i} style={rowStyle}>{values}</div>;
+  });
+
+  return row;
+}
+
+export function BarcodePathDisplay({container}) {
+  const [parentContainers, setParentContainers] = useState([]);
+
+  useEffect(() => {
+    container.getParentContainers().then(setParentContainers);
+  }, []);
+
+  if (parentContainers.length == 0) {
+    return <Loader/>;
   }
 
-  clearAll() {
-    return new Promise((res) => this.setState(initialState, res()));
-  }
-
-  setCheckoutList(container) {
-    // Clear current container field.
-    this.setCurrent('containerId', 1)
-      .then(()=>this.setCurrent('containerId', null));
-    const list = this.state.current.list;
-    list[container.coordinate] = container;
-    this.setCurrent('list', list);
-  }
-
-  editSpecimen(specimen) {
-    specimen = clone(specimen);
-    return this.setCurrent('specimen', specimen);
-  }
-
-  editContainer(container) {
-    container = clone(container);
-    return this.setCurrent('container', container);
-  }
-
-  setCurrent(name, value) {
-    const current = clone(this.state.current);
-    current[name] = value;
-    return new Promise((res) => this.setState({current}, res()));
-  }
-
-  setErrors(name, value) {
-    const errors = this.state.errors;
-    errors[name] = value;
-    this.setState({errors});
-  }
-
-  getBarcodePathDisplay(parentBarcodes) {
-    return Object.keys(parentBarcodes).map((i) => {
-      const container = Object.values(this.props.data.containers)
-        .find((container) => container.barcode == parentBarcodes[parseInt(i)+1]);
-      let coordinateDisplay;
-      if (container) {
-        const coordinate = this.getCoordinateLabel(container);
-        coordinateDisplay = <b>{'-'+(coordinate || 'UAS')}</b>;
-      }
-      return (
-        <span className='barcodePath'>
-          {i != 0 && ': '}
-          <Link key={i} to={`/barcode=${parentBarcodes[i]}`}>{parentBarcodes[i]}</Link>
-          {coordinateDisplay}
-        </span>
-      );
-    });
-  }
-
-  setSpecimen(name, value) {
-    return new Promise((resolve) => {
-      const specimen = clone(this.state.current.specimen);
-      specimen[name] = value;
-      this.setCurrent('specimen', specimen)
-      .then(() => resolve());
-    });
-  }
-
-  setContainer(name, value) {
-    return new Promise((resolve) => {
-      const container = clone(this.state.current.container);
-      value ? container[name] = value : delete container[name];
-      this.setCurrent('container', container)
-      .then(() => resolve());
-    });
-  }
-
-  render() {
-    const {current, editable, errors} = clone(this.state);
-    const {specimen, container, data, options} = this.props;
-
-    // THIS IS A PLACE HOLDER FOR BETTER LAZY LOADING
-    if (isEmpty(data.containers) || isEmpty(data.specimens) || isEmpty(data.pools)) {
-      return <LoadingBar progress={this.props.loading}/>;
+  return parentContainers.map((parentContainer, i) => {
+    let coordinateDisplay;
+    const container = parentContainers[parseInt(i)+1];
+    if (container) {
+      const coordinate = container.getCoordinateLabel(parentContainers[i].dimension).then((value) => value);
+      coordinateDisplay = <b>{'-'+(coordinate || 'UAS')}</b>;
     }
-
-    const updateContainer = (container, close = true) => {
-      this.setErrors('container', {});
-      return new Promise((resolve) => this.setState({loading: true}, () =>
-        this.props.updateContainer(container)
-        .then(() => close && this.clearEditable(),
-          (errors) => errors && this.setErrors('container', errors.container))
-        .then(() => this.setState({loading: false}, resolve()))
-      ));
-    };
-    const updateSpecimen = (specimen) => {
-      this.setErrors('specimen', {});
-      return this.setState({loading: true}, () =>
-        this.props.updateSpecimen(specimen)
-        .then(() => this.clearEditable(),
-          (errors) => errors && this.setErrors('specimen', errors.specimen))
-        .then(() => this.setState({loading: false}))
-      );
-    };
-
-    const renderMain = () => {
-      if (this.props.specimen) {
-        return (
-          <BiobankSpecimen
-            specimen={specimen}
-            container={container}
-            options={options}
-            errors={this.state.errors}
-            current={this.state.current}
-            editable={this.state.editable}
-            setCurrent={this.setCurrent}
-            edit={this.edit}
-            clearAll={this.clearAll}
-            setSpecimen={this.setSpecimen}
-            editSpecimen={this.editSpecimen}
-            updateSpecimen={updateSpecimen}
-          />
-        );
-      } else {
-        return (
-          <BiobankContainer
-            history={this.props.history}
-            container={container}
-            data={data}
-            options={options}
-            current={this.state.current}
-            editable={this.state.editable}
-            editContainer={this.editContainer}
-            updateContainer={updateContainer}
-            setCurrent={this.setCurrent}
-            setCheckoutList={this.setCheckoutList}
-            edit={this.edit}
-            clearAll={this.clearAll}
-            getCoordinateLabel={this.getCoordinateLabel}
-            getParentContainerBarcodes={this.getParentContainerBarcodes}
-            getBarcodePathDisplay={this.getBarcodePathDisplay}
-          />
-        );
-      }
-    };
-
     return (
-      <div>
-        <Link to={`/`}>
-          <span className='glyphicon glyphicon-chevron-left'/>
-          Return to Filter
-        </Link>
-        <Header
-          data={data}
-          current={current}
-          editable={editable}
-          options={options}
-          editContainer={this.editContainer}
-          edit={this.edit}
-          specimen={this.props.specimen}
-          container={this.props.container}
-          clearAll={this.clearAll}
-          setContainer={this.setContainer}
-          setSpecimen={this.setSpecimen}
-          createSpecimens={this.props.createSpecimens}
-          updateContainer={updateContainer}
-          editContainer={this.editContainer}
-          getParentContainerBarcodes={this.getParentContainerBarcodes}
-          getBarcodePathDisplay={this.getBarcodePathDisplay}
-          increaseCoordinate={this.props.increaseCoordinate}
-          printLabel={this.props.printLabel}
-        />
-        <div className='summary'>
-          <Globals
-            loading={this.state.loading}
-            current={current}
-            errors={errors}
-            editable={editable}
-            data={data}
-            options={options}
-            specimen={specimen}
-            container={container}
-            edit={this.edit}
-            clearAll={this.clearAll}
-            editContainer={this.editContainer}
-            editSpecimen={this.editSpecimen}
-            setContainer={this.setContainer}
-            setSpecimen={this.setSpecimen}
-            uC={() => this.props.updateContainer(current.container)}
-            updateContainer={updateContainer}
-            updateSpecimen={updateSpecimen}
-            getCoordinateLabel={this.getCoordinateLabel}
-            setCurrent={this.setCurrent}
-          />
-          {renderMain()}
-        </div>
-      </div>
+      <span className='barcodePath'>
+        {i != 0 && ': '}
+        <Link key={i} to={`/barcode=${parentContainer.barcode}`}>{parentContainer.barcode}</Link>
+        {coordinateDisplay}
+      </span>
     );
-  }
+  });
+}
+
+export function ActionButton({title, onClick, icon = 'chevron-right'}) {
+  const [hover, setHover] = useState(false);
+  const hoverOn = () => setHover(true);
+  const hoverOff = () => setHover(false);
+
+  const style = {
+    color: hover ? '#FFFFFF' : '#DDDDDD',
+    borderRadius: '50%',
+    height: '45px',
+    width: '45px',
+    cursor: 'pointer',
+    userSelect: 'none',
+    backgroundColor: hover ? '#093782' : '#FFFFFF',
+    border: hover ? 'none' : '2px solid #DDDDDD',
+    boxShadow: hover && '0 6px 10px 0 rgba(0, 0, 0, 0.2), 0 8px 22px 0 rgba(0, 0, 0, 0.19)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  };
+
+  const glyphStyle = {
+    fontSize: '20px',
+    top: 0,
+  };
+
+  return (
+    <span
+      title={title}
+      style={style}
+      onClick={onClick}
+      onMouseOver={hoverOn}
+      onMouseOut={hoverOff}
+    >
+      <span style={glyphStyle} className={'glyphicon glyphicon-'+icon}/>
+    </span>
+  );
 }
 
 export default BarcodePage;

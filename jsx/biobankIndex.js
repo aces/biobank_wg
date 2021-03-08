@@ -24,21 +24,24 @@ class BiobankIndex extends React.Component {
           types: {},
           typesPrimary: {},
           typesNonPrimary: {},
-          dimensions: {},
           stati: {},
         },
         diagnoses: {},
         examiners: {},
+        users: {},
         projects: {},
         sessionCenters: {},
         sessions: {},
+        shipment: {
+          statuses: {},
+        },
         specimen: {
           types: {},
           typeUnits: {},
           typeContainerTypes: {},
           protocols: {},
           protocolAttributes: {},
-          protocolContainers: {},
+          protocoContainers: {},
           processes: {},
           processAttributes: {},
           attributes: {},
@@ -181,7 +184,7 @@ class BiobankIndex extends React.Component {
     const {options, data} = this.state;
     const labelParams = [];
     const projectIds = current.projectIds;
-    const centerId = current.centerId;
+    const centerId = current.center;
     const availableId = Object.keys(options.container.stati).find(
       (key) => options.container.stati[key].label === 'Available'
     );
@@ -206,8 +209,7 @@ class BiobankIndex extends React.Component {
       container.statusId = availableId;
       container.temperature = 20;
       container.projectIds = projectIds;
-      container.centerId = centerId;
-      container.originId = centerId;
+      container.center = center;
 
       // If the container is assigned to a parent, place it sequentially in the
       // parent container and inherit the status, temperature and centerId.
@@ -224,7 +226,7 @@ class BiobankIndex extends React.Component {
         }
         container.statusId = parentContainer.statusId;
         container.temperature = parentContainer.temperature;
-        container.centerId = parentContainer.centerId;
+        container.center = parentContainer.centerId;
       }
 
       // if specimen type id is not set yet, this will throw an error
@@ -297,8 +299,7 @@ class BiobankIndex extends React.Component {
       container.statusId = availableId;
       container.temperature = 20;
       container.projectIds = current.projectIds;
-      container.originId = current.centerId;
-      container.centerId = current.centerId;
+      container.center = current.center;
 
       errors.container = this.validateContainer(container, key);
       errors.list[key] = this.validateContainer(container, key);
@@ -612,20 +613,18 @@ class BiobankIndex extends React.Component {
     };
 
     const filter = (props) => (
-      <div>
-        <BiobankFilter
-          history={props.history}
-          data={this.state.data}
-          options={this.state.options}
-          increaseCoordinate={this.increaseCoordinate}
-          createPool={this.createPool}
-          createContainers={this.createContainers}
-          createSpecimens={this.createSpecimens}
-          editSpecimens={this.editSpecimens}
-          updateSpecimens={this.updateSpecimens}
-          loading={this.state.loading}
-        />
-      </div>
+      <BiobankFilter
+        history={props.history}
+        data={this.state.data}
+        options={this.state.options}
+        increaseCoordinate={this.increaseCoordinate}
+        createPool={this.createPool}
+        createContainers={this.createContainers}
+        createSpecimens={this.createSpecimens}
+        editSpecimens={this.editSpecimens}
+        updateSpecimens={this.updateSpecimens}
+        loading={this.state.loading}
+      />
     );
 
     return (
@@ -646,7 +645,7 @@ window.addEventListener('load', () => {
   ReactDOM.render(
     <BiobankIndex
       specimenAPI={`${biobank}specimenendpoint/`}
-      containerAPI={`${biobank}containerendpoint/`}
+      containerAPI={`${biobank}containers/`}
       poolAPI={`${biobank}poolendpoint/`}
       optionsAPI={`${biobank}optionsendpoint/`}
       labelAPI={`${biobank}labelendpoint/`}

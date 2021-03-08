@@ -38,14 +38,6 @@
   margin: auto 0;
 }
 
-.action {
-  display: inline-block;
-}
-
-.action > * {
-  margin: 0 5px;
-}
-
 .action-title {
   font-size: 16px;
   display: inline;
@@ -104,95 +96,10 @@
   padding: 15px;
 }
 
-.summary {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: stretch;
-}
-
-.summary>*, .processing>* {
-  margin: 1%;
-}
-
-.globals {
-  flex: 1 1 25%;
-  height: 700px;
-  border: 2px solid #DDD;
-  border-radius: 10px;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.globals:hover {
-  border: 2px solid #A6D3F5;
-}
-
-.globals .list {
-  padding: 0px 15px;
-  height: 100%;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-}
-
-.globals .item {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin: auto 0;
-}
-
-.globals .item:last-child {
-  border-top: 2px solid #DDDDDD;
-  padding-top: 15px;
-  margin-top: 0;
-}
-
-.globals .field {
-  flex-grow: 1;
-}
-
 .form-top {
   border-top: 2px solid #DDDDDD;
   padding-top: 15px;
   margin-top: 0;
-}
-
-.inline-field {
-  display: flex;
-  flex-wrap: wrap;
-  flex-direction: row;
-  align-items: center;
-}
-
-.globals .form-group {
-  margin-bottom: 0;
-}
-
-.globals .field.link:hover .value {
-  color: #093782;
-  cursor: pointer;
-}
-
-.globals .value {
-  font-size: 22px;
-}
-
-.globals .action {
-  margin-left: auto;
-}
-
-.processing, .container-display {
-  flex-grow: 3;
-  flex-basis: 70%;
-
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
 }
 
 .panel-heading {
@@ -250,22 +157,6 @@
   color: #FFFFFF;
   cursor: pointer;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.display-container {
-  flex: 1 1 35%;
-  padding: 10px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #DDD;
-  border-radius: 10px;
-}
-
-.display-container:hover {
-  border: 2px solid #A6D3F5;
 }
 
 .display {
@@ -367,99 +258,6 @@
   font-size: 12px;
 }
 
-.action-button .glyphicon {
-  font-size: 20px;
-  top: 0;
-}
-
-.action-button {
-  font-size: 30px;
-  color: #FFFFFF;
-  border-radius: 50%;
-  height: 45px;
-  width: 45px;
-  cursor: pointer;
-  user-select: none;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.action-button.add {
-  background-color: #0f9d58;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.action-button.disabled {
-  background-color: #dddddd;
-}
-
-.action-button.pool {
-  background-color: #96398C;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.action-button.prepare {
-  background-color: #A6D3F5;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.action-button.search {
-  background-color: #E98430;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.action-button.add:hover, .pool:hover{
-  box-shadow: 0 6px 10px 0 rgba(0, 0, 0, 0.2), 0 8px 22px 0 rgba(0, 0, 0, 0.19);
-}
-
-.action-button.update, .action-button.delete {
-  background-color: #FFFFFF;
-  color: #DDDDDD;
-  border: 2px solid #DDDDDD;
-}
-
-.action-button.update:hover {
-  border: none;
-  background-color: #093782;
-  color: #FFFFFF;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.action-button.delete:hover {
-  border: none;
-  background-color: #BC1616;
-  color: #FFFFFF;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.container-list {
-  flex: 0 1 25%;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  height: 700px;
-  border: 2px solid #DDD;
-  border-radius: 10px;
-  padding: 15px;
-  font-size: 18px;
-  overflow-y: auto;
-}
-
-.container-list .container-coordinate {
-  display: flex;
-  flex-direction: row;
-}
-
-.container-list .title, .container-staging .title {
-  font-size: 25px;
-}
-
-.container-list:hover {
-  border: 2px solid #A6D3F5
-}
 
 .container-staging {
   flex: 1 0 24%;

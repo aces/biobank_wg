@@ -113,6 +113,7 @@ class OptionsEndpoint implements RequestHandlerInterface
     {
         $contCont = new ContainerController($db, $user);
         $specCont = new SpecimenController($db, $user);
+        $shipDAO = new ShipmentDAO($db);
 
         // XXX: This should eventually be replaced by a call directly to a
         // Candidate endpoint or Candidate controller that will be able to
@@ -149,6 +150,12 @@ class OptionsEndpoint implements RequestHandlerInterface
         $examiners = $db->pselectWithIndexKey($query, array(), 'id');
 
         // XXX: This should eventually be replaced by a call directly to a
+        // User endpoint or User controller that will be able to provide
+        // User Objects.
+        $query     = 'SELECT ID as id, UserID as label FROM users';
+        $users = $db->pselectWithIndexKey($query, array(), 'id');
+
+        // XXX: This should eventually be replaced by a call directly to a
         // Center Endpoint or Center Controller that will be able to provide
         // Center Objects.
         $centers = \Utility::getSiteList();
@@ -178,6 +185,7 @@ class OptionsEndpoint implements RequestHandlerInterface
             }
         }
 
+        $statuses = ['statuses' => $shipDAO->getStatuses()];
         return array(
                 'candidates'        => $candidates,
                 'diagnoses'         => $diagnoses,
@@ -185,10 +193,12 @@ class OptionsEndpoint implements RequestHandlerInterface
                 'projects'          => \Utility::getProjectList(),
                 'centers'           => $centers,
                 'examiners'         => $examiners,
+                'users'             => $users,
                 'candidateSessions' => $candidateSessions,
                 'sessionCenters'    => $sessionCenters,
                 'container'         => $contCont->getOptions(),
                 'specimen'          => $specCont->getOptions(),
+                'shipment'          => $statuses,
                );
     }
 }

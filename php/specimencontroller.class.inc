@@ -213,6 +213,18 @@ class SpecimenController
      *
      * @return void
      */
+    public function publicValidateInstance(Specimen $specimen) : void
+    {
+        $this->validateInstance($specimen);
+    }
+
+    /**
+     * Validates Specimen Data before being saved
+     *
+     * @param Specimen $specimen Specimen to be validated.
+     *
+     * @return void
+     */
     private function validateInstance(Specimen $specimen) : void
     {
         $this->validateTypeId($specimen);

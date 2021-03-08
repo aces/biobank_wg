@@ -65,11 +65,16 @@ export async function getStream(url, setProgress) {
   return JSON.parse(chunks);
 }
 
-export async function get(url) {
+export async function get(url, callBack) {
   const response = await fetch(url, {credientials: 'same-origin', method: 'GET'})
   .catch((error, errorCode, errorMsg) => console.error(error, errorCode, errorMsg));
 
-  return response.json();
+  const values = response.json();
+  if (callBack) {
+    callBack(values);
+  }
+
+  return values;
 }
 
 // function parsePartialJson(str) {
@@ -84,30 +89,30 @@ export async function get(url) {
 //   return parsed;
 // }
 
-export function post(data, url, method, onSuccess) {
-  return new Promise((resolve, reject) => {
-    return fetch(url, {
-      credentials: 'same-origin',
-      method: method,
-      body: JSON.stringify(clone(data)),
-    })
-    .then((response) => {
-      if (response.ok) {
-        onSuccess instanceof Function && onSuccess();
-        // both then and catch resolve in case the returned data is not in
-        // json format.
-        response.json()
-        .then((data) => resolve(data))
-        .catch((data) => resolve(data));
-      } else {
-        if (response.status == 403) {
-          swal('Action is forbidden or session has timed out.', '', 'error');
-        }
-        response.json()
-        .then((data) => swal(data.error, '', 'error'))
-        .then(() => reject());
-      }
-    })
-    .catch((error) => console.error(error));
-  });
+export async function post(data, url, method, onSuccess) {
+  const response = await fetch(url, {
+    credentials: 'same-origin',
+    method: method,
+    body: JSON.stringify(clone(data)),
+  })
+  .catch((error) => console.error(error));
+
+  if (response.ok) {
+    onSuccess instanceof Function && onSuccess();
+    // both then and catch resolve in case the returned data is not in
+    // json format.
+    return response.json()
+    .catch((data) => data);
+  } else {
+    const data = await response.json();
+
+    if (response.status == 403) {
+      swal('Action is forbidden or session has timed out.', '', 'error');
+    } else if (response.status === 422) {
+      return Promise.reject(data);
+    } else {
+      swal(data.error, '', 'error');
+      return Promise.reject(data.error);
+    }
+  }
 }
