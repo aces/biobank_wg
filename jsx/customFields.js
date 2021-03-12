@@ -13,34 +13,17 @@ function CustomFields(props) {
   return Object.keys(fields).map((attribute, key) => {
     const datatype = options.specimen.attributeDatatypes[fields[attribute]['datatypeId']].datatype;
     if (datatype === 'text' || datatype === 'number') {
-      if (fields[attribute]['refTableId'] === null) {
-        return (
-          <TextboxElement
-            key={key}
-            name={attribute}
-            label={fields[attribute].label}
-            onUserInput={props.setData}
-            required={fields[attribute].required}
-            value={object[attribute]}
-            errorMessage={errors[attribute]}
-          />
-        );
-      }
-
-      if (fields[attribute]['refTableId'] !== null) {
-        return (
-          <SelectElement
-            key={key}
-            name={attribute}
-            label={fields[attribute].label}
-            options={options.specimen.attributeOptions[fields[attribute].refTableId]}
-            onUserInput={props.setData}
-            required={fields[attribute].required}
-            value={object[attribute]}
-            errorMessage={errors[attribute]}
-          />
-        );
-      }
+      return (
+        <TextboxElement
+          key={key}
+          name={attribute}
+          label={fields[attribute].label}
+          onUserInput={props.setData}
+          required={fields[attribute].required}
+          value={object[attribute]}
+          errorMessage={errors[attribute]}
+        />
+      );
     }
 
     if (datatype === 'date') {

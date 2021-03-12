@@ -3,47 +3,35 @@ import PropTypes from 'prop-types';
 import {mapFormOptions, clone} from './helpers.js';
 import CustomFields from './customFields';
 
-/**
- * Biobank Specimen Process Form
- *
- * @param {object} props
- * @return {*}
- **/
-const SpecimenProcessForm = (props) => {
-
-  const setProcess = (name, value) => {
-    let process = clone(props.process);
-    process[name] = value;
-    props.setParent(props.processStage, process);
-  };
+function SpecimenProcessForm(props) {
+  const {stage, options, editable, hideProtocol, specHand} = props;
+  const specimen = specHand.getSpecimen();
+  const errors = {};
+  const process = specimen[stage] || {};
+  const typeId = specimen.typeId;
 
   const setData = (name, value) => {
-    const data = clone(props.process.data);
+    const data = clone(process.data);
     if (value instanceof File) {
-      data[name] = value.name;
-      const files = clone(props.current.files);
-      files[value.name] = value;
-      props.setCurrent('files', files);
+      // TODO: Figure this out later!
+      // data[name] = value.name;
+      // const files = clone(current.files);
+      // files[value.name] = value;
     } else {
       data[name] = value;
     }
-    setProcess('data', data);
+    specHand.setProcess('data', data, stage);
   };
 
   const setProtocol = (name, value) => {
-    setProcess('data', {});
-    setProcess(name, value);
+    specHand.setProcess('data', {}, stage);
+    specHand.setProcess(name, value, stage);
   };
-
-  const {specimen, processStage, options} = props;
-
-  const process = specimen.process;
-  const typeId = specimen.typeId;
 
   const updateButton = specimen && (
     <ButtonElement
       label="Update"
-      onUserInput={() => props.updateSpecimen(specimen)}
+      onUserInput={specHand.put}
     />
   );
 
@@ -54,7 +42,7 @@ const SpecimenProcessForm = (props) => {
     // only way I can get it to work at the moment.
     if (typeId == protocol.typeId &&
         options.specimen.processes[protocol.processId].label.toLowerCase() ==
-        processStage) {
+        stage) {
       specimenProtocols[id] = protocol.label;
       specimenProtocolAttributes[id] = options.specimen.protocolAttributes[id];
     }
@@ -71,7 +59,7 @@ const SpecimenProcessForm = (props) => {
           setData: setData,
         });
       } else {
-        setProcess('data', {});
+        specHand.setProcess('data', {}, stage);
       }
     }
   };
@@ -81,11 +69,11 @@ const SpecimenProcessForm = (props) => {
     result[id] = options.specimen.typeUnits[typeId][id].label;
     return result;
   }, {});
-  const collectionFields = processStage === 'collection' && [
+  const collectionFields = stage === 'collection' && [
     <TextboxElement
       name="quantity"
       label="Quantity"
-      onUserInput={setProcess}
+      onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
       required={true}
       value={process.quantity}
       errorMessage={errors.quantity}
@@ -94,7 +82,7 @@ const SpecimenProcessForm = (props) => {
       name="unitId"
       label="Unit"
       options={specimenTypeUnits}
-      onUserInput={setProcess}
+      onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
       required={true}
       value={process.unitId}
       errorMessage={errors.unitId}
@@ -102,7 +90,7 @@ const SpecimenProcessForm = (props) => {
     />,
   ];
 
-  const protocolField = !props.hideProtocol && (
+  const protocolField = !hideProtocol && (
     <SelectElement
       name="protocolId"
       label="Protocol"
@@ -116,14 +104,14 @@ const SpecimenProcessForm = (props) => {
   );
 
   const examiners = mapFormOptions(options.examiners, 'label');
-  if (typeId && edit === true) {
+  if (typeId && editable === true) {
     return [
       protocolField,
       <SelectElement
         name="examinerId"
         label="Done By"
         options={examiners}
-        onUserInput={setProcess}
+        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
         required={true}
         value={process.examinerId}
         errorMessage={errors.examinerId}
@@ -132,7 +120,7 @@ const SpecimenProcessForm = (props) => {
       <DateElement
         name="date"
         label="Date"
-        onUserInput={setProcess}
+        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
         required={true}
         value={process.date}
         errorMessage={errors.date}
@@ -140,7 +128,7 @@ const SpecimenProcessForm = (props) => {
       <TimeElement
         name="time"
         label="Time"
-        onUserInput={setProcess}
+        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
         required={true}
         value={process.time}
         errorMessage={errors.time}
@@ -151,13 +139,13 @@ const SpecimenProcessForm = (props) => {
       <TextareaElement
         name="comments"
         label="Comments"
-        onUserInput={setProcess}
+        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
         value={process.comments}
         errorMessage={errors.comments}
       />,
       updateButton,
     ];
-  } else if (edit === false) {
+  } else if (editable === false) {
     const protocolStaticFields = process.data &&
       Object.keys(process.data).map((key) => {
         let value = process.data[key];
@@ -180,7 +168,7 @@ const SpecimenProcessForm = (props) => {
         );
       });
 
-    const collectionStaticFields = (processStage === 'collection') && (
+    const collectionStaticFields = (stage === 'collection') && (
       <StaticElement
         label='Quantity'
         text={process.quantity+' '+options.specimen.units[process.unitId].label}
@@ -221,17 +209,11 @@ const SpecimenProcessForm = (props) => {
 };
 
 SpecimenProcessForm.propTypes = {
-  setParent: PropTypes.func.isRequired,
-  updateSpecimen: PropTypes.func,
   specimen: PropTypes.object.isRequired,
   attributeDatatypes: PropTypes.object.isRequired,
   attributeOptions: PropTypes.object.isRequired,
   specimenTypeUnits: PropTypes.object.isRequired,
   specimenTypeAttributes: PropTypes.object.isRequired,
-};
-
-SpecimenProcessForm.defaultProps = {
-  errors: {},
 };
 
 export default SpecimenProcessForm;

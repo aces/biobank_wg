@@ -2,20 +2,20 @@ import {useState} from 'react';
 import {get, post} from './helpers.js';
 
 export function useSpecimen(initSpecimen = {}) {
+  // const [initial] = useState(initSpecimen);
   const [specimen, setSpecimen] = useState(new Specimen(initSpecimen));
   const [errors, setErrors] = useState({});
-  console.log(specimen);
 
   this.set = (name, value) => setSpecimen(specimen.set(name, value));
   this.addProcess = (process) => specimen.addProcess(process);
   this.setProcess = (name, value, process) => {
-    specimen.set(process, setProcess(name, value, specimen[process]));
+    setSpecimen(specimen.set(process, specimen.setProcess(name, value, process)));
   };
   this.put = () => post(specimen, `${loris.BaseURL}/biobank/specimens/`, 'PUT')
     .catch((e) => Promise.reject(setErrors(e)));
   this.remove = (name) => setSpecimen(specimen.remove(name));
-  this.clear = () => {
-    setSpecimen(new Specimen());
+  this.clear = async () => {
+    setSpecimen(new Specimen(initSpecimen));
     setErrors({});
   };
   this.getSpecimen = () => specimen;
@@ -37,9 +37,10 @@ class Specimen {
     this.candidateAge = props.candidateAge || null;
     this.sessionId = props.sessionId || null;
     this.poolId = props.poolId || null;
-    this.collection = props.collection || new Process();
-    this.preparation = props.preparation || null;
-    this.analysis = props.analysis || null;
+    // TODO: the id should probably already be imbedded in the process...
+    this.collection = new Process({...props.collection, id: props.id});
+    this.preparation = new Process(props.preparation);
+    this.analysis = new Process(props.analysis);
   }
 
   set(name, value) {
@@ -69,12 +70,10 @@ class Specimen {
   }
 
   setProcess(name, value, process) {
-    return new Process({...process, [name]: value});
+    return new Process({...this[process], [name]: value});
   }
 
   put() {
-    console.log('trying to put!!');
-    console.log(this);
     return post(this, `${loris.BaseURL}/biobank/specimens/`, 'PUT');
   }
 
@@ -93,6 +92,8 @@ class Process {
   constructor(props = {}) {
     this.id = props.id || null;
     this.protocolId = props.protocolId || null;
+    this.quantity = props.quantity || null;
+    this.unitId = props.unitId || null;
     this.centerId = props.centerId || null;
     this.examinerId = props.examinerId || null;
     this.date = props.date || null;

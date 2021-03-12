@@ -23,7 +23,6 @@ function BarcodePage(props) {
   }
 
   const container = new Container(props.container);
-  console.log(specimen);
 
   const renderMain = specimen ? (
     <Panels height={700} grow={[1, 2]}>

@@ -23,7 +23,7 @@ function Header(props) {
     if (status == 'Available' &&
         specimen.quantity > 0 &&
         !specimen.poolId) {
-      return <ActionButton icon='plus' onClick={openAliquotForm}/>;
+      return <ActionButton icon='plus' onClick={()=>{}}/>;
     } else {
       return <ActionButton icon='plus' disabled={true}/>;
     }
