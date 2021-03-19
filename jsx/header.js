@@ -3,7 +3,7 @@ import {Link} from 'react-router-dom';
 
 // import LifeCycle from './lifeCycle.js';
 import SpecimenForm from './specimenForm.js';
-import {ActionButton} from './barcodePage';
+import {ActionButton} from './components';
 
 import Container, {useContainer} from './Container.js';
 import {BarcodePathDisplay} from './barcodePage.js';

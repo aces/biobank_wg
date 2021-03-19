@@ -63,10 +63,10 @@ class Module extends \Module
                                                                                 
         $pagename = $this->getName();                                           
         $path     = trim($request->getURI()->getPath(), "/");                   
-        if ($path == 'optionsendpoint' ||                                       
-            $path == 'poolendpoint' ||                                          
-            $path == 'containerendpoint' ||                                     
-            $path == 'specimenendpoint') {                                      
+        if ($path == 'options' ||                                       
+            $path == 'pools' ||                                          
+            $path == 'containers' ||                                     
+            $path == 'specimens') {                                      
             // There is a subpage                                               
             $pagename = explode("/", $path)[0];                                 
         }                                                                       

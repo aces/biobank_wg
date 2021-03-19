@@ -1,4 +1,4 @@
-import SpecimenProcessForm from './processForm';
+import ProcessForm from './processForm';
 import {VerticalTabs, TabPane} from 'Tabs';
 import Modal from 'Modal';
 import Loader from 'Loader';
@@ -246,7 +246,7 @@ class BatchEditForm extends React.PureComponent {
           text={options.specimen.protocols[collection.protocolId].label}
         />
         <EditForm>
-          {SpecimenProcessForm({
+          {ProcessForm({
             edit: true,
             errors: errors.specimen.collection || {},
             options: options,
@@ -268,7 +268,7 @@ class BatchEditForm extends React.PureComponent {
           text={options.specimen.protocols[preparation.protocolId].label}
         />
         <EditForm>
-          {SpecimenProcessForm({
+          {ProcessForm({
             edit: true,
             errors: errors.specimen.preparation || {},
             options: options,

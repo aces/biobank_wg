@@ -1,14 +1,17 @@
 import React, {useState, useEffect} from 'react';
 import {Link} from 'react-router-dom';
 
-import {Panels} from 'Panel';
+import {SimplePanel} from 'Panel';
+import {ActionButton, List} from './components';
 import Globals from './globals';
 import Header from './header';
-import BiobankSpecimen from './specimen';
+import ProcessForm from './processForm';
 import ContainerDisplay from './containerDisplay';
 import Loader from 'Loader';
 
 import Container from './Container.js';
+import {useSpecimen} from './Specimen';
+import {SaveButton} from './components';
 
 function BarcodePage(props) {
   const {data, options, edit, history} = props;
@@ -24,38 +27,70 @@ function BarcodePage(props) {
 
   const container = new Container(props.container);
 
+  const style = {
+    display: 'flex',
+    flexFlow: 'row wrap',
+  };
+  const style1 = {
+    flex: '1 0 25%',
+    minWidth: '300px',
+  };
+  const style2 = {
+    flex: '1 0 75%',
+    display: 'flex',
+    flexFlow: 'row wrap',
+  };
   const renderMain = specimen ? (
-    <Panels height={700} grow={[1, 2]}>
-      <Globals
-        data={data}
-        options={options}
-        specimen={specimen}
-        container={container}
-      />
-      <BiobankSpecimen
-        specimen={specimen}
-        options={options}
-      />
-    </Panels>
+    <div style={style}>
+      <div style={style1}>
+        <Globals
+          data={data}
+          options={options}
+          specimen={specimen}
+          container={container}
+        />
+      </div>
+      <div style={style2}>
+        <ProcessPanel
+          stage='collection'
+          specimen={specimen}
+          options={options}
+        />
+        <ProcessPanel
+          stage='preparation'
+          specimen={specimen}
+          options={options}
+        />
+        <ProcessPanel
+          stage='analysis'
+          specimen={specimen}
+          options={options}
+        />
+      </div>
+    </div>
   ) : (
-    <Panels height={700} grow={[1, 2, 1]}>
+    <>
       <Globals
         data={data}
         options={options}
         specimen={specimen}
         container={container}
       />
-      <ContainerDisplay
-        history={history}
-        data={data}
-        container={container}
-        options={options}
-      />
-      <ContainerList
-        container={container}
-        data={data}
-      />
-    </Panels>
+      <SimplePanel>
+        <ContainerDisplay
+          history={history}
+          data={data}
+          container={container}
+          options={options}
+        />
+      </SimplePanel>
+      <SimplePanel>
+        <ContainerList
+          container={container}
+          data={data}
+        />
+      </SimplePanel>
+    </>
   );
 
   return (
@@ -134,19 +169,6 @@ function ContainerList({container, data = {}}) {
   return <div style={listStyle}>{content}</div>;
 }
 
-function List({rows = []}) {
-  const rowStyle = {display: 'flex', flexDirection: 'row'};
-
-  const row = rows.map((row = [], i) => {
-  const valueStyle = {flex: '1', margin: '0 2%'};
-    const values = row
-      .map((value, i) => <div key={i} style={valueStyle}>{value}</div>);
-    return <div key={i} style={rowStyle}>{values}</div>;
-  });
-
-  return row;
-}
-
 export function BarcodePathDisplay({container}) {
   const [parentContainers, setParentContainers] = useState([]);
 
@@ -175,42 +197,64 @@ export function BarcodePathDisplay({container}) {
   });
 }
 
-export function ActionButton({title, onClick, icon = 'chevron-right'}) {
-  const [hover, setHover] = useState(false);
-  const hoverOn = () => setHover(true);
-  const hoverOff = () => setHover(false);
+function ProcessPanel(props) {
+  const {options, stage} = props;
+  const [editable, setEditable] = useState(false);
 
-  const style = {
-    color: hover ? '#FFFFFF' : '#DDDDDD',
-    borderRadius: '50%',
-    height: '45px',
-    width: '45px',
-    cursor: 'pointer',
-    userSelect: 'none',
-    backgroundColor: hover ? '#093782' : '#FFFFFF',
-    border: hover ? 'none' : '2px solid #DDDDDD',
-    boxShadow: hover && '0 6px 10px 0 rgba(0, 0, 0, 0.2), 0 8px 22px 0 rgba(0, 0, 0, 0.19)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  };
+  const specHand = new useSpecimen(props.specimen);
+  const specimen = specHand.getSpecimen();
+  const process = specimen[stage];
 
-  const glyphStyle = {
-    fontSize: '20px',
-    top: 0,
-  };
+  if (!process.id) {
+    return null;
+  }
 
-  return (
-    <span
-      title={title}
-      style={style}
-      onClick={onClick}
-      onMouseOver={hoverOn}
-      onMouseOut={hoverOff}
-    >
-      <span style={glyphStyle} className={'glyphicon glyphicon-'+icon}/>
-    </span>
+  const edit = () => setEditable(true);
+  const clear = () => specHand.clear().then(setEditable(false));
+
+  const protocolExists = Object.values(options.specimen.protocols).find(
+    (protocol) => {
+      return protocol.typeId == specimen.typeId &&
+      options.specimen.processes[protocol.processId].label ==
+      stage.replace(/^\w/, (c) => c.toUpperCase());
+    }
   );
+
+  let panel = null;
+  if (protocolExists &&
+      !process &&
+      !editable &&
+      loris.userHasPermission('biobank_specimen_update')) {
+    const addProcess = () => specHand.addProcess(stage);
+    panel = (
+      <div className='panel inactive'>
+        <ActionButton onClick={addProcess} icon={'add'}/>
+        <div>ADD {stage.toUpperCase()}</div>
+      </div>
+    );
+  }
+  const allowEdit = loris.userHasPermission('biobank_specimen_alter') && !editable;
+  if (process.id) {
+    panel = (
+      <SimplePanel
+        flex={'1 0 25%'}
+        title={stage.replace(/^\w/, (c) => c.toUpperCase())}
+        edit={allowEdit && edit}
+      >
+        <FormElement>
+          <ProcessForm
+            options={options}
+            stage={stage}
+            editable={editable}
+            specHand={specHand}
+          />
+          {editable && <SaveButton onSubmit={specHand.put} onCancel={clear}/>}
+        </FormElement>
+      </SimplePanel>
+    );
+  }
+
+  return panel;
 }
 
 export default BarcodePage;

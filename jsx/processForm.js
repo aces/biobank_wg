@@ -1,45 +1,19 @@
 import React from 'react';
-import PropTypes from 'prop-types';
-import {mapFormOptions, clone} from './helpers.js';
-import CustomFields from './customFields';
+import {mapFormOptions} from './helpers.js';
 
-function SpecimenProcessForm(props) {
+function ProcessForm(props) {
   const {stage, options, editable, hideProtocol, specHand} = props;
   const specimen = specHand.getSpecimen();
   const errors = {};
   const process = specimen[stage] || {};
   const typeId = specimen.typeId;
 
-  const setData = (name, value) => {
-    const data = clone(process.data);
-    if (value instanceof File) {
-      // TODO: Figure this out later!
-      // data[name] = value.name;
-      // const files = clone(current.files);
-      // files[value.name] = value;
-    } else {
-      data[name] = value;
-    }
-    specHand.setProcess('data', data, stage);
-  };
-
-  const setProtocol = (name, value) => {
-    specHand.setProcess('data', {}, stage);
-    specHand.setProcess(name, value, stage);
-  };
-
-  const updateButton = specimen && (
-    <ButtonElement
-      label="Update"
-      onUserInput={specHand.put}
-    />
-  );
+  const setProcess = (name, value) => specHand.setProcess(name, value, stage);
+  const setData = (name, value) => specHand.setData(name, value, stage);
 
   let specimenProtocols = {};
   let specimenProtocolAttributes = {};
   Object.entries(options.specimen.protocols).forEach(([id, protocol]) => {
-    // FIXME: I really don't like 'toLowerCase()' function, but it's the
-    // only way I can get it to work at the moment.
     if (typeId == protocol.typeId &&
         options.specimen.processes[protocol.processId].label.toLowerCase() ==
         stage) {
@@ -53,7 +27,7 @@ function SpecimenProcessForm(props) {
       if (process.data) {
         return CustomFields({
           options: options,
-          errors: errors.data || {},
+          errors: errors.data,
           fields: specimenProtocolAttributes[process.protocolId],
           object: process.data,
           setData: setData,
@@ -73,7 +47,7 @@ function SpecimenProcessForm(props) {
     <TextboxElement
       name="quantity"
       label="Quantity"
-      onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
+      onUserInput={setProcess}
       required={true}
       value={process.quantity}
       errorMessage={errors.quantity}
@@ -82,7 +56,7 @@ function SpecimenProcessForm(props) {
       name="unitId"
       label="Unit"
       options={specimenTypeUnits}
-      onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
+      onUserInput={setProcess}
       required={true}
       value={process.unitId}
       errorMessage={errors.unitId}
@@ -95,7 +69,7 @@ function SpecimenProcessForm(props) {
       name="protocolId"
       label="Protocol"
       options={specimenProtocols}
-      onUserInput={setProtocol}
+      onUserInput={setProcess}
       required={true}
       value={process.protocolId}
       errorMessage={errors.protocolId}
@@ -104,14 +78,14 @@ function SpecimenProcessForm(props) {
   );
 
   const examiners = mapFormOptions(options.examiners, 'label');
-  if (typeId && editable === true) {
+  if (typeId && editable) {
     return [
       protocolField,
       <SelectElement
         name="examinerId"
         label="Done By"
         options={examiners}
-        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
+        onUserInput={setProcess}
         required={true}
         value={process.examinerId}
         errorMessage={errors.examinerId}
@@ -120,7 +94,7 @@ function SpecimenProcessForm(props) {
       <DateElement
         name="date"
         label="Date"
-        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
+        onUserInput={setProcess}
         required={true}
         value={process.date}
         errorMessage={errors.date}
@@ -128,22 +102,21 @@ function SpecimenProcessForm(props) {
       <TimeElement
         name="time"
         label="Time"
-        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
+        onUserInput={setProcess}
         required={true}
         value={process.time}
         errorMessage={errors.time}
       />,
       collectionFields,
-      <div className='form-top'/>,
+      <HorizontalRule/>,
       renderProtocolFields(),
       <TextareaElement
         name="comments"
         label="Comments"
-        onUserInput={(name, value) => specHand.setProcess(name, value, stage)}
+        onUserInput={setProcess}
         value={process.comments}
         errorMessage={errors.comments}
       />,
-      updateButton,
     ];
   } else if (editable === false) {
     const protocolStaticFields = process.data &&
@@ -154,11 +127,6 @@ function SpecimenProcessForm(props) {
         } else if (process.data[key] === false) {
           value = 'No';
         }
-        // FIXME: The label used to be produced in the following way:
-        // label={options.specimen.protocolAttributes[process.protocolId][key].label}
-        // However, causes issues when there is data in the data
-        // object, but the protocolId is not associated with any attributes.
-        // This is a configuration/importing issue that should be fixed.
         return (
           <StaticElement
             key={key}
@@ -208,12 +176,38 @@ function SpecimenProcessForm(props) {
   return null;
 };
 
-SpecimenProcessForm.propTypes = {
-  specimen: PropTypes.object.isRequired,
-  attributeDatatypes: PropTypes.object.isRequired,
-  attributeOptions: PropTypes.object.isRequired,
-  specimenTypeUnits: PropTypes.object.isRequired,
-  specimenTypeAttributes: PropTypes.object.isRequired,
-};
+function CustomFields(props) {
+  const {options, errors = {}, fields, object, setData} = props;
 
-export default SpecimenProcessForm;
+  return Object.keys(fields).map((attribute, key) => {
+    const datatype = options.specimen.attributeDatatypes[fields[attribute]['datatypeId']].datatype;
+    const passedProps = {
+      name: attribute,
+      label: fields[attribute].label,
+      onUserInput: setData,
+      required: fields[attribute].required,
+      value: object[attribute],
+      errorMessage: errors[attribute],
+    };
+    switch (datatype) {
+      case 'text':
+      case 'number':
+        return <TextboxElement {...passedProps}/>;
+      case 'date':
+        return <DateElement {...passedProps}/>;
+      case 'time':
+        return <TimeElement {...passedProps}/>;
+      case 'boolean':
+        return <CheckboxElement {...passedProps}/>;
+    };
+
+    // TODO: add this again later.
+    // Do not present the possibility of uploading if file is already set
+    // File must instead be deleted or overwritten.
+    // case (datatype === 'file' && !(data||{})[attribute]):
+    //   return <FileElement {...passedProps} />;
+    // }
+  });
+}
+
+export default ProcessForm;

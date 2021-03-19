@@ -62,11 +62,11 @@ abstract class Process implements \JsonSerializable
     /**
      * Sets the ID of the specimen's processing protocol.
      *
-     * @param int $protocolId the ID of the processing protocol
+     * @param ?int $protocolId the ID of the processing protocol
      *
      * @return void
      */
-    public function setProtocolId(int $protocolId) : void
+    public function setProtocolId(?int $protocolId) : void
     {
         if ($protocolId > 0) {
             $this->protocolId = $protocolId;
@@ -76,9 +76,9 @@ abstract class Process implements \JsonSerializable
     /**
      * Gets the ID of the specimen's processing protocol.
      *
-     * @return int
+     * @return ?int
      */
-    public function getProtocolId() : int
+    public function getProtocolId() : ?int
     {
         return $this->protocolId;
     }

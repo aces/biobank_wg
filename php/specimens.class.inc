@@ -28,7 +28,7 @@ use \Psr\Http\Message\ResponseInterface;
  * @license    http://www.gnu.org/licenses/gpl-3.0.text GPLv3
  * @link       http://www.github.com/aces/Lors/
  */
-class SpecimenEndpoint implements RequestHandlerInterface
+class Specimens implements RequestHandlerInterface
 {
     /**
      * Returns true if user has acces to this Endpoint.
@@ -117,7 +117,7 @@ class SpecimenEndpoint implements RequestHandlerInterface
             }
         } catch (\BadRequest $e) {
             $db->rollBack();
-            return new \LORIS\Http\Response\BadRequest($e->getMessage());
+            return new \LORIS\Http\Response\JsonResponse($e->getMessage(), 400);
         } catch (\Forbidden $e) {
             $db->rollBack();
             return new \LORIS\Http\Response\Forbidden($e->getMessage());

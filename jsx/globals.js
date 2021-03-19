@@ -1,13 +1,13 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {Link} from 'react-router-dom';
 import {mapFormOptions} from './helpers.js';
 
 import {useContainer} from './Container.js';
 import {useSpecimen} from './Specimen.js';
-import {ActionButton} from './barcodePage';
+import {InlineForm} from './components';
 
+import {SimplePanel} from 'Panel';
 import TriggerableModal from 'TriggerableModal';
-import {Saving} from 'Loader';
 import ContainerParentForm from './containerParentForm';
 
 /**
@@ -39,7 +39,7 @@ function Globals(props) {
   const containerTypeField = (
     <InlineForm
       label={'Container Type'}
-      updateValue={updateContainerType}
+      update={updateContainerType}
       value={options.container.types[container.typeId].label}
     >
       <SelectElement
@@ -65,7 +65,7 @@ function Globals(props) {
   const quantityField = specimen.quantity && (
     <InlineForm
       label='Quantity'
-      updateValue={specHand.put}
+      update={specHand.put}
       value={Math.round(specimen.quantity * 100) / 100+
       ' '+(options.specimen.units[specimen.unitId]||{}).label}
     >
@@ -88,7 +88,7 @@ function Globals(props) {
   const fTCycleField = specimen.fTCycle && (
     <InlineForm
       label={'Freeze-Thaw Cycle'}
-      updateValue={options.specimen.types[specimen.typeId].freezeThaw == 1 && specHand.put}
+      update={options.specimen.types[specimen.typeId].freezeThaw == 1 && specHand.put}
       value={specimen.fTCycle || 0}
     >
       <NumericElement
@@ -103,7 +103,7 @@ function Globals(props) {
   const temperatureField = (
     <InlineForm
       label={'Temperature'}
-      updateValue={!container.parentContainerId && contHand.put}
+      update={!container.parentContainerId && contHand.put}
       value={container.temperature + '°'}
     >
       <TextboxElement
@@ -119,7 +119,7 @@ function Globals(props) {
   const statusField = (
     <InlineForm
       label={'Status'}
-      updateValue={contHand.put}
+      update={contHand.put}
       value={options.container.stati[container.statusId].label}
       subValue={container.comments}
     >
@@ -136,7 +136,7 @@ function Globals(props) {
   const projectField = (
     <InlineForm
       label='Projects'
-      updateValue={contHand.put}
+      update={contHand.put}
       value={container.projectIds.length !== 0 ?
        container.projectIds
          .map((id) => options.projects[id])
@@ -259,127 +259,48 @@ function Globals(props) {
   };
 
   return (
-    <div style={style}>
-      {specimenTypeField}
-      {containerTypeField}
-      {poolField}
-      {quantityField}
-      {fTCycleField}
-      {temperatureField}
-      <InlineForm
-        label={'Lot Number'}
-        updateValue={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
-        value={container.lotNumber}
-      >
-        <TextboxElement
-          name='lotNumber'
-          onUserInput={contHand.set}
+    <SimplePanel>
+      <div style={style}>
+        {specimenTypeField}
+        {containerTypeField}
+        {poolField}
+        {quantityField}
+        {fTCycleField}
+        {temperatureField}
+        <InlineForm
+          label={'Lot Number'}
+          update={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
           value={container.lotNumber}
-          errorMessage={cErrors.lotNumber}
-        />
-      </InlineForm>
-      <InlineForm
-        label={'Expiration Date'}
-        updateValue={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
-        value={container.expirationDate}
-      >
-        <DateElement
-          name='expirationDate'
-          onUserInput={contHand.set}
+        >
+          <TextboxElement
+            name='lotNumber'
+            onUserInput={contHand.set}
+            value={container.lotNumber}
+            errorMessage={cErrors.lotNumber}
+          />
+        </InlineForm>
+        <InlineForm
+          label={'Expiration Date'}
+          update={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
           value={container.expirationDate}
-          errorMessage={cErrors.expirationDate}
-          today={false}
-        />
-      </InlineForm>
-      {statusField}
-      {projectField}
-      {centerField}
-      {parentSpecimenField()}
-      {parentContainerField()}
-      {candidateSessionField}
-    </div>
-  );
-}
-
-function InlineForm(props) {
-  const {children, label, updateValue, link, value, subValue} = props;
-  const [loading, setLoading] = useState(false);
-  const [editable, setEditable] = useState(false);
-
-  const update = async () => {
-    setLoading(true);
-    await updateValue();
-    setEditable(false);
-    setLoading(false);
-  };
-
-  const submitButton = !loading ? (
-    <>
-      <div style={{margin: '0 1%'}}>
-        <ButtonElement
-          label="Update"
-          onUserInput={update}
-          columnSize= 'col-xs-11'
-        />
+        >
+          <DateElement
+            name='expirationDate'
+            onUserInput={contHand.set}
+            value={container.expirationDate}
+            errorMessage={cErrors.expirationDate}
+            today={false}
+          />
+        </InlineForm>
+        {statusField}
+        {projectField}
+        {centerField}
+        {parentSpecimenField()}
+        {parentContainerField()}
+        {candidateSessionField}
       </div>
-      <div style={{margin: '0 1%'}}>
-        <a onClick={()=>setEditable(false)} style={{cursor: 'pointer'}}>
-          Cancel
-        </a>
-      </div>
-    </>
-  ) : <Saving loading={loading}/>;
-
-  const editButton = updateValue instanceof Function && (
-    <div><ActionButton title={'Update '+label} onClick={() => setEditable(true)}/></div>
+    </SimplePanel>
   );
-
-  const staticField = (
-    <InlineField>
-      <Value link={link} value={value}/>
-      {subValue}
-      {editButton}
-    </InlineField>
-  );
-
-  const fields = React.Children.map(children, (child) => {
-    return (
-      <div style={{flex: '1', minWidth: '90px'}}>
-        {React.cloneElement(child, {inputClass: 'col-lg-11'})}
-      </div>
-    );
-  });
-
-  const dynamicField = (
-    <InlineField>
-      {fields}
-      {submitButton}
-    </InlineField>
-  );
-
-  return <>{label}{editable ? dynamicField : staticField}</>;
-}
-
-function InlineField({children}) {
-  const style = {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: 'auto 0',
-    flexWrap: 'wrap',
-  };
-  return <div style={style}>{children}</div>;
-}
-
-function Value({value = '—', link}) {
-  // XXX: default param not working for some reason
-  value = value || '—';
-  const style = {
-    fontSize: '22px',
-    flex: 1,
-  };
-  const formattedValue = link ? <a href={link}>{value}</a> : value;
-  return <div style={style}>{formattedValue}</div>;
 }
 
 export default Globals;

@@ -11,6 +11,10 @@ export function useSpecimen(initSpecimen = {}) {
   this.setProcess = (name, value, process) => {
     setSpecimen(specimen.set(process, specimen.setProcess(name, value, process)));
   };
+  this.setData = (name, value, process) => {
+    data = {...specimen[process].data, [name]: value};
+    setProcess('data', data, process);
+  };
   this.put = () => post(specimen, `${loris.BaseURL}/biobank/specimens/`, 'PUT')
     .catch((e) => Promise.reject(setErrors(e)));
   this.remove = (name) => setSpecimen(specimen.remove(name));

@@ -644,10 +644,10 @@ window.addEventListener('load', () => {
   const biobank = `${loris.BaseURL}/biobank/`;
   ReactDOM.render(
     <BiobankIndex
-      specimenAPI={`${biobank}specimenendpoint/`}
+      specimenAPI={`${biobank}specimens/`}
       containerAPI={`${biobank}containers/`}
-      poolAPI={`${biobank}poolendpoint/`}
-      optionsAPI={`${biobank}optionsendpoint/`}
+      poolAPI={`${biobank}pools/`}
+      optionsAPI={`${biobank}options/`}
       labelAPI={`${biobank}labelendpoint/`}
     />,
     document.getElementById('lorisworkspace'));

@@ -6,7 +6,7 @@ export function useContainer(initContainer = {}) {
   const [errors, setErrors] = useState({});
 
   this.set = (name, value) => setContainer(container.set(name, value));
-  this.put = () => post(container, `${loris.BaseURL}/biobank/containers/`, 'PUT')
+  this.put = async () => await post(container, `${loris.BaseURL}/biobank/containers/`, 'PUT')
     .catch((e) => Promise.reject(setErrors(e)));
   this.remove = (name) => setContainer(container.remove(name));
   this.clear = () => {

@@ -571,7 +571,7 @@ class SpecimenDAO extends \LORIS\Data\ProvisionerInstance
 
         $preparation = $specimen->getPreparation();
         $preparationData = [];
-        if (isset($preparation)) {
+        if (null !== $preparation->getProtocolId()) {
             $preparationData = array(
                                 'SpecimenID'         => $specimen->getId(),
                                 'SpecimenProtocolID' => $preparation->getProtocolId(),
@@ -588,7 +588,7 @@ class SpecimenDAO extends \LORIS\Data\ProvisionerInstance
 
         $analysis = $specimen->getAnalysis();
         $analysisData = [];
-        if (isset($analysis)) {
+        if (null !== $analysis->getProtocolId()) {
             $analysisData = array(
                              'SpecimenID'         => $specimen->getId(),
                              'SpecimenProtocolID' => $analysis->getProtocolId(),

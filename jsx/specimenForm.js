@@ -1,4 +1,4 @@
-import SpecimenProcessForm from './processForm';
+import ProcessForm from './processForm';
 import ContainerParentForm from './containerParentForm';
 import {ListForm, ListItem} from './listForm';
 import Modal from 'Modal';
@@ -441,7 +441,7 @@ class SpecimenBarcodeForm extends React.Component {
           value={item.container.expirationDate}
           errorMessage={(errors.container||{}).expirationDate}
         />
-        <SpecimenProcessForm
+        <ProcessForm
           edit={true}
           errors={(errors.specimen||{}).collection}
           options={options}

@@ -437,7 +437,7 @@ class SpecimenController
     private function validatePreparation(Specimen $specimen) : void
     {
         $preparation = $specimen->getPreparation();
-        if (isset($preparation)) {
+        if (null !== $preparation->getProtocolId()) {
             $this->validateProtocolId($preparation);
             $this->validateExaminerId($preparation);
             $this->validateCenterId($preparation);
@@ -460,7 +460,7 @@ class SpecimenController
     {
         // Validate Analysis
         $analysis = $specimen->getAnalysis();
-        if (isset($analysis)) {
+        if (null !== $analysis->getProtocolId()) {
             $this->validateProtocolId($analysis);
             $this->validateExaminerId($analysis);
             $this->validateCenterId($analysis);

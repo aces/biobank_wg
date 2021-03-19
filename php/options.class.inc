@@ -28,7 +28,7 @@ use \Psr\Http\Message\ResponseInterface;
  * @license    http://www.gnu.org/licenses/gpl-3.0.text GPLv3
  * @link       http://www.github.com/aces/Loris/
  */
-class OptionsEndpoint implements RequestHandlerInterface
+class Options implements RequestHandlerInterface
 {
     /**
      * Returns true if user has access to this endpoint.

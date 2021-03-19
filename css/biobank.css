@@ -47,49 +47,6 @@
   margin: 0 5px;
 }
 
-.lifecycle {
-  flex-basis: 73%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  margin: 0 auto;
-}
-
-.lifecycle-graphic {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.lifecycle-node {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  background: #FFFFFF;
-  border: 2px solid #A6D3F5;
-  border-radius: 50%;
-  color: #768CAD;
-  height: 45px;
-  width: 45px;
-  z-index: 2;
-  user-select: none;
-}
-
-.lifecycle-node .letter {
-  font-size: 24px;
-  font-weight: bold;
-  cursor: default;
-}
-
-.lifecycle-line {
-  background: #A6D3F5;
-  height: 2px;
-  width: 50%;
-  margin: 0px 10px;
-  z-index: 1;
-}
-
 .filter {
   border: 1px solid #DDD;
   border-radius: 10px;
@@ -107,36 +64,6 @@
 
   display: flex;
   flex-direction: row;
-  align-items: center;
-}
-
-.specimen-panel {
-  flex-basis: 30%;
-  flex-grow: 1;
-}
-
-.specimen-panel .title {
-  margin-left: 10px;
-}
-
-.specimen-panel .glyphicon-pencil {
-  margin-left: auto;
-}
-
-.glyphicon-pencil:hover {
-  cursor: pointer;
-  text-shadow: 0 0 5px #093782;
-}
-
-.specimen-panel.inactive {
-  border: 2px dashed #DDD;
-  border-radius: 10px;
-  font-size: 30px;
-  color: #DDD;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-items: center;
 }
 
