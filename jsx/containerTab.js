@@ -46,7 +46,7 @@ class ContainerTab extends Component {
     value = this.mapContainerColumns(column, value);
     switch (column) {
       case 'Barcode':
-        return <td><Link to={`/barcode=${value}`}>{value}</Link></td>;
+        return <Link to={`/barcode=${value}`}>{value}</Link>;
       case 'Status':
         const style = {};
         switch (value) {
@@ -63,13 +63,13 @@ class ContainerTab extends Component {
             style.color = 'red';
             break;
         }
-        return <td style={style}>{value}</td>;
+        return <div style={style}>{value}</div>;
       case 'Projects':
-        return <td>{value.join(', ')}</td>;
+        return value.join(', ');
       case 'Parent Barcode':
-        return <td><Link to={`/barcode=${value}`}>{value}</Link></td>;
+        return <Link to={`/barcode=${value}`}>{value}</Link>;
       default:
-        return <td>{value}</td>;
+        return value;
     }
   }
 

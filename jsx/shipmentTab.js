@@ -34,10 +34,9 @@ function ShipmentTab(props) {
   const formatShipmentColumns = (column, value, row) => {
     switch (column) {
       case 'Barcode':
-        const barcode = <Link to={`/barcode=${value}`}>{value}</Link>;
-        return <td>{barcode}</td>;
+        return <Link to={`/barcode=${value}`}>{value}</Link>;
       default:
-        return <td>{value}</td>;
+        return value;
     }
   };
 

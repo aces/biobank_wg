@@ -58,20 +58,20 @@ class PoolTab extends Component {
             }
           })
           .reduce((prev, curr) => [prev, ', ', curr]);
-        return <td>{barcodes}</td>;
+        return barcodes;
       case 'PSCID':
         const pscidURL = loris.BaseURL + '/'
         + Object.values(options.candidates).find((cand) => cand.pscid == value).id;
-        return <td><a href={pscidURL}>{value}</a></td>;
+        return <a href={pscidURL}>{value}</a>;
       case 'Visit Label':
         const visitLabelURL = loris.BaseURL+'/instrument_list/?candID='+row['PSCID']+
           '&sessionID='+Object.values(options.sessions).find((sess) => sess.label == value).id;
-        return <td><a href={visitLabelURL}>{value}</a></td>;
+        return <a href={visitLabelURL}>{value}</a>;
       case 'Aliquot':
         const onClick = () => this.openAliquotForm(row['ID']);
-        return <td><CTA label='Aliquot' onUserInput={onClick}/></td>;
+        return <CTA label='Aliquot' onUserInput={onClick}/>;
       default:
-        return <td>{value}</td>;
+        return value;
     }
   }
 

@@ -60,18 +60,18 @@ class SpecimenTab extends Component {
       .find((cand) => cand.pscid == row['PSCID']).id;
     switch (column) {
       case 'Barcode':
-        return <td><Link to={`/barcode=${value}`}>{value}</Link></td>;
+        return <Link to={`/barcode=${value}`}>{value}</Link>;
       case 'Parent Specimens':
         const barcodes = value && value.map((id, key) => {
           return <Link key={key} to={`/barcode=${value}`}>{value}</Link>;
         }).reduce((prev, curr) => [prev, ', ', curr]);
-        return <td>{barcodes}</td>;
+        return barcodes;
       case 'PSCID':
-        return <td><a href={loris.BaseURL + '/' + candId}>{value}</a></td>;
+        return <a href={loris.BaseURL + '/' + candId}>{value}</a>;
       case 'Visit Label':
         const visitLabelURL = loris.BaseURL+'/instrument_list/?candID='+candId+
           '&sessionID='+Object.values(options.sessions).find((sess) => sess.label == value).id;
-        return <td><a href={visitLabelURL}>{value}</a></td>;
+        return <a href={visitLabelURL}>{value}</a>;
       case 'Status':
         const style = {};
         switch (value) {
@@ -88,13 +88,13 @@ class SpecimenTab extends Component {
             style.color = 'red';
             break;
         }
-        return <td style={style}>{value}</td>;
+        return <div style={style}>{value}</div>;
       case 'Projects':
-        return <td>{value.join(', ')}</td>;
+        return value.join(', ');
       case 'Container Barcode':
-        return <td><Link to={`/barcode=${value}`}>{value}</Link></td>;
+        return <Link to={`/barcode=${value}`}>{value}</Link>;
       default:
-        return <td>{value}</td>;
+        return value;
      }
   }
   render() {
