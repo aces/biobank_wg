@@ -2,95 +2,78 @@ import React, {useState, useEffect} from 'react';
 import {Link} from 'react-router-dom';
 
 import {SimplePanel} from 'Panel';
-import {ActionButton, List} from './components';
+import {ActionButton, List, FlexContainer, FlexItem} from './components';
 import Globals from './globals';
 import Header from './header';
 import ProcessForm from './processForm';
 import ContainerDisplay from './containerDisplay';
 import Loader from 'Loader';
 
-import Container from './Container.js';
+import Container, {useContainer} from './Container.js';
 import {useSpecimen} from './Specimen';
 import {SaveButton} from './components';
 
-function BarcodePage(props) {
-  const {data, options, edit, history} = props;
-  const {specimen} = props;
-
-  if (!props.container) {
+function BarcodePage({
+  data,
+  options,
+  edit,
+  history,
+  container,
+  specimen,
+  createSpecimens,
+  increaseCoordinate,
+  printLabel,
+}) {
+  if (!container) {
     return <Loader/>;
   }
 
-  if (!specimen) {
-    return <Loader/>;
-  }
+  const contHand = new useContainer(container);
+  container = contHand.getContainer();
 
-  const container = new Container(props.container);
+  // if (!specimen) {
+  //   return <Loader/>;
+  // }
 
-  const style = {
-    display: 'flex',
-    flexFlow: 'row wrap',
-  };
-  const style1 = {
-    flex: '1 0 25%',
-    minWidth: '300px',
-  };
-  const style2 = {
-    flex: '1 0 75%',
-    display: 'flex',
-    flexFlow: 'row wrap',
-  };
-  const renderMain = specimen ? (
-    <div style={style}>
-      <div style={style1}>
-        <Globals
-          data={data}
-          options={options}
-          specimen={specimen}
-          container={container}
-        />
-      </div>
-      <div style={style2}>
-        <ProcessPanel
-          stage='collection'
-          specimen={specimen}
-          options={options}
-        />
-        <ProcessPanel
-          stage='preparation'
-          specimen={specimen}
-          options={options}
-        />
-        <ProcessPanel
-          stage='analysis'
-          specimen={specimen}
-          options={options}
-        />
-      </div>
-    </div>
-  ) : (
+  const main = specimen ? (
     <>
-      <Globals
-        data={data}
-        options={options}
+      <ProcessPanel
+        stage='collection'
         specimen={specimen}
-        container={container}
+        options={options}
       />
-      <SimplePanel>
-        <ContainerDisplay
-          history={history}
-          data={data}
-          container={container}
-          options={options}
-        />
-      </SimplePanel>
-      <SimplePanel>
-        <ContainerList
-          container={container}
-          data={data}
-        />
-      </SimplePanel>
+      <ProcessPanel
+        stage='preparation'
+        specimen={specimen}
+        options={options}
+      />
+      <ProcessPanel
+        stage='analysis'
+        specimen={specimen}
+        options={options}
+      />
     </>
+  ) : (
+    <FlexContainer>
+      <FlexItem flex={3}>
+        <SimplePanel>
+          <ContainerDisplay
+            history={history}
+            data={data}
+            container={container}
+            options={options}
+          />
+        </SimplePanel>
+      </FlexItem>
+      <FlexItem flex={1}>
+        <SimplePanel>
+          <ContainerList
+            container={container}
+            data={data}
+          />
+        </SimplePanel>
+      </FlexItem>
+    </FlexContainer>
   );
 
   return (
@@ -101,11 +84,26 @@ function BarcodePage(props) {
         edit={edit}
         specimen={specimen}
         container={container}
-        createSpecimens={props.createSpecimens}
-        increaseCoordinate={props.increaseCoordinate}
-        printLabel={props.printLabel}
+        createSpecimens={createSpecimens}
+        increaseCoordinate={increaseCoordinate}
+        printLabel={printLabel}
       />
-      {renderMain}
+      <FlexContainer height={70}>
+        <FlexItem flex={1} minWidth={30}>
+          <SimplePanel>
+            <Globals
+              data={data}
+              options={options}
+              specimen={specimen}
+              container={container}
+              contHand={contHand}
+            />
+          </SimplePanel>
+        </FlexItem>
+        <FlexItem flex={3}>
+          {main}
+        </FlexItem>
+      </FlexContainer>
     </>
   );
 }
@@ -160,8 +158,6 @@ function ContainerList({container, data = {}}) {
 
   const listStyle = {
     fontSize: '18px',
-    height: '100%',
-    overflowY: 'auto',
   };
 
   const content = loading ? <Loader/> : <List rows={rows}/>;
@@ -197,12 +193,15 @@ export function BarcodePathDisplay({container}) {
   });
 }
 
-function ProcessPanel(props) {
-  const {options, stage} = props;
+function ProcessPanel({
+  options,
+  stage,
+  specimen,
+}) {
   const [editable, setEditable] = useState(false);
 
-  const specHand = new useSpecimen(props.specimen);
-  const specimen = specHand.getSpecimen();
+  const specHand = new useSpecimen(specimen);
+  specimen = specHand.getSpecimen();
   const process = specimen[stage];
 
   if (!process.id) {
@@ -237,7 +236,7 @@ function ProcessPanel(props) {
   if (process.id) {
     panel = (
       <SimplePanel
-        flex={'1 0 25%'}
+        flex={1}
         title={stage.replace(/^\w/, (c) => c.toUpperCase())}
         edit={allowEdit && edit}
       >

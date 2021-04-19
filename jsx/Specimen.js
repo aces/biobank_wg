@@ -2,8 +2,8 @@ import {useState} from 'react';
 import {get, post} from './helpers.js';
 
 export function useSpecimen(initSpecimen = {}) {
-  // const [initial] = useState(initSpecimen);
-  const [specimen, setSpecimen] = useState(new Specimen(initSpecimen));
+  const [init] = useState(initSpecimen);
+  const [specimen, setSpecimen] = useState(new Specimen(init));
   const [errors, setErrors] = useState({});
 
   this.set = (name, value) => setSpecimen(specimen.set(name, value));
@@ -19,7 +19,7 @@ export function useSpecimen(initSpecimen = {}) {
     .catch((e) => Promise.reject(setErrors(e)));
   this.remove = (name) => setSpecimen(specimen.remove(name));
   this.clear = async () => {
-    setSpecimen(new Specimen(initSpecimen));
+    setSpecimen(new Specimen(init));
     setErrors({});
   };
   this.getSpecimen = () => specimen;

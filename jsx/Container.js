@@ -2,15 +2,23 @@ import {useState} from 'react';
 import {get, post} from './helpers.js';
 
 export function useContainer(initContainer = {}) {
-  const [container, setContainer] = useState(new Container(initContainer));
+  const [init, setInit] = useState(new Container(initContainer));
+  console.log(init);
+  const [container, setContainer] = useState(new Container(init));
   const [errors, setErrors] = useState({});
 
   this.set = (name, value) => setContainer(container.set(name, value));
   this.put = async () => await post(container, `${loris.BaseURL}/biobank/containers/`, 'PUT')
+    .then((containers) => {
+      setInit(new Container(containers[0]));
+      console.log(containers[0]);
+      setContainer(new Container(containers[0]));
+    })
     .catch((e) => Promise.reject(setErrors(e)));
   this.remove = (name) => setContainer(container.remove(name));
   this.clear = () => {
-    setContainer(new Container());
+    console.log(init);
+    setContainer(init);
     setErrors({});
   };
   this.getContainer = () => container;

@@ -1,7 +1,7 @@
 import {useEffect} from 'react';
 import swal from 'sweetalert2';
 import {mapFormOptions} from './helpers.js';
-import {ActionButton} from './barcodePage.js';
+import {ActionButton} from './components.js';
 
 import {BarcodePathDisplay} from './barcodePage';
 
@@ -389,7 +389,6 @@ function ContainerDisplay(props) {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'space-evenly',
-    height: '100%',
   };
 
   const checkoutButton = () => {

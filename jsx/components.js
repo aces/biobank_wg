@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {Saving} from 'Loader';
 
 export function ActionButton({title, onClick, icon = 'chevron-right'}) {
   const [hover, setHover] = useState(false);
@@ -52,10 +53,13 @@ export function List({rows = []}) {
 }
 
 // TODO: might be useful to make some sort of "Centered" component.
-export function SaveButton(props) {
+export function SaveButton({
+  onSubmit,
+  onSuccess,
+  onCancel,
+}) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const {onSubmit, onSuccess, onCancel} = props;
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const submit = async () => {
@@ -73,20 +77,22 @@ export function SaveButton(props) {
   } else if (loading) {
     body = <Saving loading={loading}/>;
   } else {
-    body = [
-      <div style={{margin: '0 4px'}}>
-        <ButtonElement
-          label="Save"
-          onUserInput={submit}
-          columnSize= 'col-xs-11'
-        />
-      </div>,
-      <div style={{margin: '0 4px 15px 4px'}}>
-        <a onClick={onCancel} style={{cursor: 'pointer'}}>
-          Cancel
-        </a>
-      </div>,
-    ];
+    body = (
+      <>
+        <div style={{margin: '0 4px'}}>
+          <ButtonElement
+            label="Save"
+            onUserInput={submit}
+            columnSize= 'col-xs-11'
+          />
+        </div>
+        <div style={{margin: '0 4px 15px 4px'}}>
+          <a onClick={onCancel} style={{cursor: 'pointer'}}>
+            Cancel
+          </a>
+        </div>
+      </>
+    );
   }
 
   const containerStyle = {
@@ -103,22 +109,33 @@ export function SaveButton(props) {
   );
 }
 
-export function InlineForm(props) {
-  const {children, label, update, link, value, subValue} = props;
+export function InlineForm({
+  children,
+  label,
+  update,
+  link,
+  value,
+  subValue,
+  cancel,
+}) {
   const [editable, setEditable] = useState(false);
   const edit = () => setEditable(true);
-  const clear = () => setEditable(false);
+  const clear = () => {
+    cancel();
+    setEditable(false);
+  };
+  const success = () => setEditable(false);
 
   const editButton = update instanceof Function && (
     <ActionButton title={'Update '+label} onClick={edit}/>
   );
 
   const staticField = (
-    <InlineField>
+    <FlexContainer>
       <Value link={link} value={value}/>
       {subValue}
       {editButton}
-    </InlineField>
+    </FlexContainer>
   );
 
   const fields = React.Children.map(children, (child) => {
@@ -130,24 +147,13 @@ export function InlineForm(props) {
   });
 
   const dynamicField = (
-    <InlineField>
+    <FlexContainer>
       {fields}
-      <SaveButton onSubmit={update} onSuccess={clear} onCancel={clear}/>
-    </InlineField>
+      <SaveButton onSubmit={update} onSuccess={success} onCancel={clear}/>
+    </FlexContainer>
   );
 
-  return <>{label}{editable ? dynamicField : staticField}</>;
-}
-
-function InlineField({children}) {
-  const style = {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: 'auto 0',
-    flexWrap: 'wrap',
-  };
-  return <div style={style}>{children}</div>;
+  return <div>{label}{editable ? dynamicField : staticField}</div>;
 }
 
 function Value({value = '—', link}) {
@@ -161,22 +167,32 @@ function Value({value = '—', link}) {
   return <div style={style}>{formattedValue}</div>;
 }
 
-export function FlexContainer({children}) {
-  const containerStyle = {
+export function FlexContainer({
+  children,
+  align = 'stretch',
+  flow = 'row wrap',
+  height,
+  justify,
+}) {
+  const style = {
     display: 'flex',
-    justifyContent: 'center',
+    alignItems: align,
+    flexFlow: flow,
+    justifyContent: 'space-'+justify,
+    height: height+'em',
   };
-
-  return <div style={containerStyle}>{children}</div>;
-}
+  return <div style={style}>{children}</div>;
+};
 
 export function FlexItem({children, flex = 1, minWidth}) {
-  const itemStyle = {
+  const style = {
+    display: 'flex',
+    alignItems: 'stretch',
     flex,
-    minWidth,
+    minWidth: minWidth+'em',
   };
-  return <div style={itemStyle}>{children}</div>;
-}
+  return <div style={style}>{children}</div>;
+};
 
 // .lifecycle {
 //   flex-basis: 73%;

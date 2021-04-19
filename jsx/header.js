@@ -5,19 +5,23 @@ import {Link} from 'react-router-dom';
 import SpecimenForm from './specimenForm.js';
 import {ActionButton} from './components';
 
-import Container, {useContainer} from './Container.js';
+import Container from './Container.js';
 import {BarcodePathDisplay} from './barcodePage.js';
 
 import swal from 'sweetalert2';
 
-function Header(props) {
-  const {options, data, clearAll, increaseCoordinate, current} = props;
-  const {printLabel} = props;
-  const {specimen, setSpecimen, createSpecimens} = props;
-
-  const containerHandler = new useContainer(props.container);
-  const container = containerHandler.getContainer();
-
+function Header({
+  options,
+  data,
+  clearAll,
+  increaseCoordinate,
+  current,
+  container,
+  printLabel,
+  specimen,
+  setSpecimen,
+  createSpecimen,
+}) {
   const status = options.container.stati[container.statusId].label;
   const renderActionButton = () => {
     if (status == 'Available' &&
@@ -63,8 +67,7 @@ function Header(props) {
   return (
     <div className="specimen-header">
       <Link to={`/`}>
-        <span className='glyphicon glyphicon-chevron-left'/>
-        Return to Filter
+        <ActionButton icon='chevron-left'/>
       </Link>
       <div className='specimen-title'>
         <div className='barcode'>

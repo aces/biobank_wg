@@ -3,7 +3,8 @@ import Container from './Container.js';
 import {get, post} from './helpers.js';
 
 export function useShipment(initShipment = {}) {
-  const [shipment, setShipment] = useState(new Shipment(initShipment));
+  const [init] = useState(initShipment);
+  const [shipment, setShipment] = useState(new Shipment(init));
   const [errors, setErrors] = useState({logs: []});
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function useShipment(initShipment = {}) {
   this.setLog = (name, value, index) => this.setLogs(shipment.setLog(name, value, index));
   this.remove = (name) => setShipment(shipment.remove(name));
   this.clear = () => {
-    setShipment(new Shipment());
+    setShipment(new Shipment(init));
     setErrors({logs: []});
   };
   this.post = () => post(shipment, `${loris.BaseURL}/biobank/shipments/`, 'POST')

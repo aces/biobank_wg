@@ -142,7 +142,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                      GROUP_CONCAT(DISTINCT(bcpr.ProjectID)) as ProjectIDs,
                      GROUP_CONCAT(DISTINCT(bcsr.ShipmentID)) as ShipmentIDs,
                      bc.Temperature,
-                     bc.CurrentCenterID as CenterID,
+                     bc.CenterID as CenterID,
                      bcp.ParentContainerID,
                      GROUP_CONCAT(DISTINCT(bcp2.ContainerID)) as ChildContainerIDs,
                      bcp.Coordinate as Coordinate,
@@ -167,7 +167,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                   LEFT JOIN biobank_specimen bs
                     ON bc.ContainerID=bs.ContainerID
                   LEFT JOIN psc 
-                    ON bc.CurrentCenterID=psc.CenterID';
+                    ON bc.CenterID=psc.CenterID';
         if (!empty($conditions)) {
             $whereClause = [];
             foreach($conditions as $condition) {
@@ -276,7 +276,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
      *
      * @return array $containerDimensions All data concerning each container dimension
      */
-    public function getDimension($id) : array
+    public function getDimensions($id) : array
     {
         $query      = "SELECT ContainerDimensionID as id,
                               X as x,
@@ -418,7 +418,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
             $updatedContainers = array_merge($updatedChildren, $updatedContainers);
         }
         if ($container->getCenterId() !== $oldContainer->getCenterId()) {
-            $updatedChildren = $this->cascadeToChildren($container, 'CurrentCenterID', $container->getCenterId());
+            $updatedChildren = $this->cascadeToChildren($container, 'CenterID', $container->getCenterId());
             $updatedContainers = array_merge($updatedChildren, $updatedContainers);
         }
 
@@ -563,7 +563,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                            'ContainerTypeID'   => $container->getTypeId(),
                            'Temperature'       => $container->getTemperature(),
                            'ContainerStatusID' => $container->getStatusId(),
-                           'CurrentCenterID'   => $container->getCenterId(),
+                           'CenterID'          => $container->getCenterId(),
                            'LotNumber'         => $container->getLotNumber(),
                            'ExpirationDate'    => $expirationDate,
                            'Comments'          => $container->getComments(),

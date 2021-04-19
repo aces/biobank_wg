@@ -2,11 +2,9 @@ import React from 'react';
 import {Link} from 'react-router-dom';
 import {mapFormOptions} from './helpers.js';
 
-import {useContainer} from './Container.js';
 import {useSpecimen} from './Specimen.js';
-import {InlineForm} from './components';
+import {InlineForm, FlexContainer} from './components';
 
-import {SimplePanel} from 'Panel';
 import TriggerableModal from 'TriggerableModal';
 import ContainerParentForm from './containerParentForm';
 
@@ -16,15 +14,18 @@ import ContainerParentForm from './containerParentForm';
  * @param {object} props
  * @return {*}
  **/
-function Globals(props) {
-  const {current, data, options} = props;
-
-  const contHand = new useContainer(props.container);
-  const container = contHand.getContainer();
+function Globals({
+  current,
+  data,
+  options,
+  container,
+  specimen,
+  contHand,
+}) {
   const cErrors = contHand.getErrors();
 
-  const specHand = new useSpecimen(props.specimen);
-  const specimen = specHand.getSpecimen();
+  const specHand = new useSpecimen(specimen);
+  specimen = specHand.getSpecimen();
   const sErrors = specHand.getErrors();
 
   const specimenTypeField = specimen.typeId && (
@@ -40,6 +41,7 @@ function Globals(props) {
     <InlineForm
       label={'Container Type'}
       update={updateContainerType}
+      cancel={contHand.clear}
       value={options.container.types[container.typeId].label}
     >
       <SelectElement
@@ -66,6 +68,7 @@ function Globals(props) {
     <InlineForm
       label='Quantity'
       update={specHand.put}
+      cancel={specHand.clear}
       value={Math.round(specimen.quantity * 100) / 100+
       ' '+(options.specimen.units[specimen.unitId]||{}).label}
     >
@@ -89,6 +92,7 @@ function Globals(props) {
     <InlineForm
       label={'Freeze-Thaw Cycle'}
       update={options.specimen.types[specimen.typeId].freezeThaw == 1 && specHand.put}
+      cancel={specHand.clear}
       value={specimen.fTCycle || 0}
     >
       <NumericElement
@@ -104,6 +108,7 @@ function Globals(props) {
     <InlineForm
       label={'Temperature'}
       update={!container.parentContainerId && contHand.put}
+      cancel={contHand.clear}
       value={container.temperature + '°'}
     >
       <TextboxElement
@@ -120,6 +125,7 @@ function Globals(props) {
     <InlineForm
       label={'Status'}
       update={contHand.put}
+      cancel={contHand.clear}
       value={options.container.stati[container.statusId].label}
       subValue={container.comments}
     >
@@ -137,6 +143,7 @@ function Globals(props) {
     <InlineForm
       label='Projects'
       update={contHand.put}
+      cancel={contHand.clear}
       value={container.projectIds.length !== 0 ?
        container.projectIds
          .map((id) => options.projects[id])
@@ -252,54 +259,48 @@ function Globals(props) {
     </>
   );
 
-  const style = {
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-  };
-
   return (
-    <SimplePanel>
-      <div style={style}>
-        {specimenTypeField}
-        {containerTypeField}
-        {poolField}
-        {quantityField}
-        {fTCycleField}
-        {temperatureField}
-        <InlineForm
-          label={'Lot Number'}
-          update={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
+    <FlexContainer flow={'column'} justify={'around'} height={70}>
+      {specimenTypeField}
+      {containerTypeField}
+      {poolField}
+      {quantityField}
+      {fTCycleField}
+      {temperatureField}
+      <InlineForm
+        label={'Lot Number'}
+        update={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
+        cancel={contHand.clear}
+        value={container.lotNumber}
+      >
+        <TextboxElement
+          name='lotNumber'
+          onUserInput={contHand.set}
           value={container.lotNumber}
-        >
-          <TextboxElement
-            name='lotNumber'
-            onUserInput={contHand.set}
-            value={container.lotNumber}
-            errorMessage={cErrors.lotNumber}
-          />
-        </InlineForm>
-        <InlineForm
-          label={'Expiration Date'}
-          update={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
+          errorMessage={cErrors.lotNumber}
+        />
+      </InlineForm>
+      <InlineForm
+        label={'Expiration Date'}
+        update={loris.userHasPermission('biobank_specimen_alter') && contHand.put}
+        cancel={contHand.clear}
+        value={container.expirationDate}
+      >
+        <DateElement
+          name='expirationDate'
+          onUserInput={contHand.set}
           value={container.expirationDate}
-        >
-          <DateElement
-            name='expirationDate'
-            onUserInput={contHand.set}
-            value={container.expirationDate}
-            errorMessage={cErrors.expirationDate}
-            today={false}
-          />
-        </InlineForm>
-        {statusField}
-        {projectField}
-        {centerField}
-        {parentSpecimenField()}
-        {parentContainerField()}
-        {candidateSessionField}
-      </div>
-    </SimplePanel>
+          errorMessage={cErrors.expirationDate}
+          today={false}
+        />
+      </InlineForm>
+      {statusField}
+      {projectField}
+      {centerField}
+      {parentSpecimenField()}
+      {parentContainerField()}
+      {candidateSessionField}
+    </FlexContainer>
   );
 }
 

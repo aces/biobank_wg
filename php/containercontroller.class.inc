@@ -489,7 +489,7 @@ class ContainerController
             }
 
             $parentContainer = $this->dao->getInstanceFromId($parentContainerId); 
-            $dimensions      = $this->dao->getDimensions($parentContainer->getDimensionId());
+            $dimensions      = $parentContainer->getDimension();
             $capacity        = $dimensions['x'] * $dimensions['y'] * $dimensions['z'];
             if ($container->getCoordinate() > $capacity) {
                throw new \BadRequest(
