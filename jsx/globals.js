@@ -191,9 +191,7 @@ function Globals({
       // Set Parent Container Barcode Value if it exists
       const parentContainerBarcodeValue = () => {
         if (container.parentContainerId) {
-          const barcode = data.containers[
-                          container.parentContainerId
-                        ].barcode;
+          const barcode = data.containers[container.parentContainerId].barcode;
           return <Link to={`/barcode=${barcode}`}>{barcode}</Link>;
         }
       };
@@ -208,11 +206,10 @@ function Globals({
              >
                <ContainerParentForm
                  display={true}
-                 current={current}
+                 contHand={contHand}
                  container={container}
                  options={options}
                  data={data}
-                 setContainer={contHand.set}
                />
              </TriggerableModal>
           );

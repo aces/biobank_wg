@@ -116,7 +116,7 @@ class Containers implements RequestHandlerInterface
             }
         } catch (\BadRequest $e) {
             $db->rollBack();
-            return new \LORIS\Http\Response\JSONResponse($e->getMessage(), 422);
+            return new \LORIS\Http\Response\JsonResponse($e->getMessage(), 422);
         } catch (\Forbidden $e) {
             $db->rollBack();
             return new \LORIS\Http\Response\Forbidden($e->getMessage());

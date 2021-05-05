@@ -86,41 +86,6 @@
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
 }
 
-.display {
-  height: 500px;
-  width: 500px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  margin: auto;
-}
-
-.display .row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin: auto;
-  width: 100%;
-}
-
-.display .node{
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: auto;
-
-  background: #FFFFFF;
-  height: 100%;
-  border: 2px solid #D3D3D3;
-  z-index: 2 ;
-  cursor: default;
-  user-select: none;
-}
-
-.display .node.checkout {
-  border: 2px solid orange;
-}
-
 @keyframes occupy {
   0% {border: 2px solid #DDDDDD;}
   10% {border: 2px solid #0f9d58; background: #C7E8D8}
@@ -140,37 +105,42 @@
   transition: max-height 0.25s ease-in-out, opacity 0.25s ease-in-out;
 }
 
-.display .node.new {
+.node {
+  border: 0.2em solid #D3D3D3;
+  cursor: default;
+}
+
+.node.new {
   border: 2px solid #093782;
   cursor: pointer;
   animation: occupy 5s ease-in 0s 1 normal;
 }
 
-.display .node.selected {
+.node.selected {
   border: 2px solid #A6D3F5;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
 }
 
-.display .node.occupied {
+.node.occupied {
   border: 2px solid #093782;
   cursor: pointer;
 }
 
-.display .node.available {
+.node.available {
   border: 2px solid #A6D3F5;
   cursor: pointer;
 }
 
-.display .node.forbidden {
+.node.forbidden {
   background: #DDDDDD;
 }
 
-.display .occupied:hover, .display .available:hover{
+.occupied:hover, .display .available:hover{
   border: 2px solid #093782;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
 }
 
-.display .load:hover {
+.load:hover {
   border: 2px solid #A6D3F5;
   cursor: pointer;
 }
@@ -184,7 +154,6 @@
 .barcodePath {
   font-size: 12px;
 }
-
 
 .container-staging {
   flex: 1 0 24%;

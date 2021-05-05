@@ -186,8 +186,6 @@ export function FlexContainer({
 
 export function FlexItem({children, flex = 1, minWidth}) {
   const style = {
-    display: 'flex',
-    alignItems: 'stretch',
     flex,
     minWidth: minWidth+'em',
   };

@@ -1,83 +1,317 @@
-import {useEffect} from 'react';
+import {useState, useContext} from 'react';
 import swal from 'sweetalert2';
 import {mapFormOptions} from './helpers.js';
-import {ActionButton} from './components.js';
+import {ActionButton, SaveButton} from './components.js';
+import Container from './Container';
+import {DispatchContext, DataContext} from './biobankIndex';
 
-import {BarcodePathDisplay} from './barcodePage';
+// import {BarcodePathDisplay} from './barcodePage';
 
-function ContainerDisplay(props) {
-  const {data, options} = props;
-  const {history, select, container, selectedCoordinate} = props;
-  const {clearAll, editContainer, setContainer, updateContainer, setCurrent, setCheckoutList, edit} = props;
+function ContainerDisplay({
+  container,
+  modifier = () => ({}),
+}) {
+  // TODO: Ideally, these should be parsed already.
+  const dimension = {};
+  Object.keys(container.dimension).forEach((key) => {
+    dimension[key] = parseInt(container.dimension[key]);
+  });
+  const row = Array.from(Array(dimension.y)).map((value, y) => {
+    const column = Array.from(Array(dimension.x)).map((value, x) => {
+      const coordinate = x+1 + (dimension.x * y);
+      const coordinateDisplay = () => {
+        if (dimension.xNum == 1 && dimension.yNum == 1) {
+          return coordinate;
+        } else {
+          const xVal = dimension.xNum == 1 ? x+1 : String.fromCharCode(65+x);
+          const yVal = dimension.yNum == 1 ? y+1 : String.fromCharCode(65+y);
+          return yVal+''+xVal;
+        }
+      };
 
-  // TODO: These are place holders!!!!
-  const current = {};
-  const editable = {};
+      return (
+        <Node
+          id={coordinate}
+          key={x}
+          width={(50/dimension.x) - (50/dimension.x * 0.08)}
+          {...modifier(coordinate)}
+        >
+          {coordinateDisplay()}
+        </Node>
+      );
+    });
 
-  useEffect(() => {
-    $('[data-toggle="tooltip"]').tooltip();
+    const rowHeight = (50/dimension.y) - (50/dimension.y * 0.08);
+    return <Row key={y} height={rowHeight}>{column}</Row>;
   });
 
-  // const parentContainers = <Suspense fallBack={[]} callBack={container.getParentContainers}/>;
-  const barcodes = mapFormOptions(data.containers, 'barcode');
-  // console.log(parentContainers);
-  // delete values that are parents of the container
-  // parentContainers
-  //   .forEach((container) => Object.keys(barcodes)
-  //     .forEach((i) => (container.barcode == barcodes[i]) && delete barcodes[i])
-  // );
+  return <Display>{row}</Display>;
+};
 
-  const coordinates = data.containers[container.id].childContainerIds
+const Display = ({children}) => {
+  const style = {
+    height: '50em',
+    width: '50em',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    margin: 'auto',
+  };
+  return <div style={style}>{children}</div>;
+};
+
+const Row = ({children, height}) => {
+  const style = {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: 'auto',
+    width: '100%',
+    height: height+'em',
+  };
+  return <div style={style}>{children}</div>;
+};
+
+const Node = ({
+  children,
+  id,
+  width,
+  nodeClass = 'node',
+  title,
+  draggable = 'false',
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onClick,
+}) => {
+  const style = {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 'auto',
+    background: '#FFFFFF',
+    height: '100%',
+    width: width+'em',
+    zIndex: '2',
+    userSelect: 'none',
+  };
+  const allowDrop = (e) => onDrop instanceof Function && e.preventDefault();
+  return (
+    <div
+      id={id}
+      className={nodeClass}
+      onClick={onClick}
+      draggable={onDragStart instanceof Function}
+      onDragStart={onDragStart}
+      onDragOver={allowDrop}
+      onDrop={onDrop}
+      style={style}
+    >
+      {children}
+    </div>
+  );
+};
+
+// .display .node.checkout {
+//   border: 2px solid orange;
+// }
+// const parentContainers = <Suspense fallBack={[]} callBack={container.getParentContainers}/>;
+// const barcodes = mapFormOptions(data.containers, 'barcode');
+// console.log(parentContainers);
+// delete values that are parents of the container
+// parentContainers
+//   .forEach((container) => Object.keys(barcodes)
+//     .forEach((i) => (container.barcode == barcodes[i]) && delete barcodes[i])
+// );
+
+export function ContainerInterface({
+  options,
+  history,
+  container,
+  contHand,
+}) {
+  const dispatch = useContext(DispatchContext);
+  const data = useContext(DataContext);
+  const childCoords = container.childContainerIds
     .reduce((result, id) => {
-      const container = data.containers[id];
-      if (container.coordinate) {
-        result[container.coordinate] = id;
+      const childContainer = data.containers[id];
+      if (childContainer.coordinate) {
+        result[childContainer.coordinate] = id;
       }
       return result;
     }, {});
 
-  const dimension = container.dimension;
-
   const redirectURL = (e) => {
-    let coordinate = e.target.id;
-    if (coordinates[coordinate]) {
-      let barcode = data.containers[coordinates[coordinate]].barcode;
-      history.push(`/barcode=${barcode}`);
-    }
+    let childCoord = e.target.id;
+    let barcode = data.containers[childCoords[childCoord]].barcode;
+    history.push(`/barcode=${barcode}`);
   };
 
-  const allowDrop = (e) => e.preventDefault();
-
-  const drag = (e) => {
-    $('[data-toggle="tooltip"]').tooltip('hide');
-    let container = JSON.stringify(
-      data.containers[coordinates[e.target.id]]
+  const onDrop = async (e) => {
+    e.preventDefault();
+    const container = new Container(
+      JSON.parse(e.dataTransfer.getData('text/plain'))
     );
+    const newCoordinate = parseInt(e.target.id);
+    container.coordinate = newCoordinate;
+    const containers = await container.put();
+    dispatch({type: 'update', entity: 'containers', payload: containers});
+  };
+
+  const onDragStart = (e) => {
+    // $('[data-toggle="tooltip"]').tooltip('hide');
+    const container = JSON.stringify(data.containers[childCoords[e.target.id]]);
     e.dataTransfer.setData('text/plain', container);
   };
 
-  const drop = (e) => {
-    e.preventDefault();
-    const container = JSON.parse(e.dataTransfer.getData('text/plain'));
-    const newCoordinate = parseInt(e.target.id);
-    container.coordinate = newCoordinate;
-    updateContainer(container, false);
+  const modifier = (childCoord) => {
+    if (childCoords[childCoord]) {
+      return {
+        onClick: redirectURL,
+        nodeClass: 'node occupied',
+        onDragStart,
+      };
+    } else {
+      return {
+        onDrop,
+      };
+    }
   };
+
+  return <ContainerDisplay container={container} modifier={modifier}/>;
+};
+
+// if (select) {
+//   if (coordinate == selectedCoordinate) {
+//     nodeClass = 'node occupied';
+//   } else if (selectedCoordinate instanceof Array &&
+//              selectedCoordinate.includes(coordinate)) {
+//     nodeClass = 'node occupied';
+//   } else if (!coordinates) {
+//     nodeClass = 'node available';
+//     onClick = (e) => contHand.set('coordinate', e.target.id);
+//   } else if (coordinates) {
+//     if (!coordinates[coordinate]) {
+//       nodeClass = 'node available';
+//       onClick = (e) => contHand.set('coordinate', e.target.id);
+//     } else if (coordinates[coordinate]) {
+//       const childContainer = data.containers[coordinates[coordinate]];
+//       const specimen = Object.values(data.specimens)
+//         .find((specimen) => specimen.containerId == childContainer.id);
+//       let quantity = '';
+//       if (specimen) {
+//         quantity = `<h5>${specimen.quantity + ' '+options.specimen.units[specimen.unitId].label}</h5>`;
+//       }
+//     }
+//   }
+// }
+
+export function ContainerCheckout({container}) {
+  const [list, setList] = useState({});
+  const [editable, setEditable] = useState(false);
+
+  const checkoutContainers = () => {
+    const checkoutPromises = Object.values(list).map((container) => {
+      container.parentContainerId = null;
+      container.coordinate = null;
+      container.put();
+    });
+
+    Promise.all(checkoutPromises)
+    .then(() => swal('Containers Successfully Checked Out!', '', 'success'));
+  };
+
+  if (editable) {
+    // TODO: Only children of the current container can be checked out.
+    // TODO: This needs to be decoupled.
+    let children = {};
+    if ((container||{}).childContainerIds) {
+      Object.values(data.containers).map((c) => {
+        container.childContainerIds.forEach((id) => {
+          if (c.id == id) {
+            children[id] = c;
+          }
+        });
+      });
+    }
+
+    let barcodes = mapFormOptions(children, 'barcode');
+
+    const setCheckoutList = (container) => {
+      const newList = {...list, [container.coordinate]: container};
+      setList(newList);
+    };
+
+    return (
+      <div className={editable ? 'open' : 'closed'}>
+        <FormElement>
+          <StaticElement
+            label='Note'
+            text="Click, Select or Scan Containers to be Unloaded and Press 'Confirm'"
+          />
+          <InputList
+            name='barcode'
+            label='Container'
+            items={list}
+            setItems={setCheckoutList}
+            options={barcodes}
+          />
+          <SaveButton
+            onSubmit={checkoutContainers}
+            onCancel={() => setEditable(false)}
+          />
+        </FormElement>
+        <ContainerPanel
+          onNodeClick={setCheckoutList}
+        />
+      </div>
+    );
+  }
+
+  const CheckoutButton = () => {
+    if (!(loris.userHasPermission('biobank_container_update')) ||
+        (container.childContainerIds.length == 0)) {
+      return;
+    }
+
+    return (
+      <ActionButton
+        title={'Checkout Child Containers'}
+        onClick={() => setEditable(true)}
+        icon={'share'}
+      />
+    );
+  };
+
+  // TODO: For modifier
+  // if (editable.containerCheckout) {
+  //   mod.onClick = (e) => {
+  //     let container = data.containers[coordinates[e.target.id]];
+  //     setCheckoutList(container);
+  //   };
+  // }
+
+  return <CheckoutButton/>;
+};
+
+export function ContainerLoader({
+  container,
+}) {
+  const [editable, setEditable] = useState(false);
+  const [sequential, setSequential] = useState(false);
 
   const increaseCoordinate = (coordinate) => {
     const capacity = dimension.x * dimension.y * dimension.z;
     coordinate++;
     Object.keys(coordinates).forEach((c) => {
       if (coordinate > capacity) {
-        clearAll();
+        // clearAll();
       } else if (c == coordinate) {
         coordinate++;
       }
     });
-    setCurrent('coordinate', coordinate);
+    setCoordinate(coordinate);
   };
-
-  const setBarcode = (name, barcode) => setCurrent('barcode', barcode);
 
   const loadContainer = () => {
     const barcode = current.barcode;
@@ -90,51 +324,32 @@ function ContainerDisplay(props) {
 
     const newContainer = data.containers[containerId];
     newContainer.parentContainerId = container.id;
-    newContainer.coordinate = current.coordinate;
+    newContainer.coordinate = coordinate;
 
-    updateContainer(newContainer, false)
+    contHand.put()
     .then(() => {
       if (current.sequential) {
-        let coordinate = current.coordinate;
         increaseCoordinate(coordinate);
-        setCurrent('barcode', null);
+        setBarcode(null);
       } else {
-        clearAll();
+        // clearAll();
       }
     });
 
-    setCurrent('prevCoordinate', newContainer.coordinate);
+    setPrevCoordinate(newContainer.coordinate);
   };
 
-  const checkoutContainers = () => {
-    const checkoutList = current.list;
-    const checkoutPromises = Object.values(checkoutList).map((container) => {
-      container.parentContainerId = null;
-      container.coordinate = null;
-      return updateContainer(container, false);
-    });
-
-    Promise.all(checkoutPromises)
-    .then(() => clearAll())
-    .then(() => swal('Containers Successfully Checked Out!', '', 'success'));
-  };
-
-  let barcodeField;
-  if ((editable||{}).loadContainer) {
-    barcodeField = (
-      <TextboxElement
-        name='barcode'
-        label='Barcode'
-        onUserInput={setBarcode}
-        value={current.barcode}
-        placeHolder='Please Scan or Type Barcode'
-        autoFocus={true}
-      />
-    );
+  if (!editable) {
+    return null;
   }
 
-  let load = (
-    <div className={((editable||{}).loadContainer) ? 'open' : 'closed'}>
+  // TODO: for modifier
+  // if (editable.loadContainer) {
+  //   mod.onClick = null;
+  // }
+
+  return (
+    <div className={editable ? 'open' : 'closed'}>
       <FormElement>
         <StaticElement
           label='Note'
@@ -144,285 +359,27 @@ function ContainerDisplay(props) {
         <CheckboxElement
           name='sequential'
           label='Sequential'
-          value={current.sequential}
-          onUserInput={setCurrent}
+          value={sequential}
+          onUserInput={(name, value) => setSequential(value)}
         />
-        {barcodeField}
+        <TextboxElement
+          name='barcode'
+          label='Barcode'
+          onUserInput={(name, value) => setBarcode(value)}
+          value={current.barcode}
+          placeHolder='Please Scan or Type Barcode'
+          autoFocus={true}
+        />
         <ButtonElement
           label='Load'
           onUserInput={loadContainer}
         />
         <StaticElement
-          text={<a onClick={clearAll} style={{cursor: 'pointer'}}>Cancel</a>}
+          text={<a onClick={() => setEditable(false)} style={{cursor: 'pointer'}}>Cancel</a>}
         />
       </FormElement>
     </div>
   );
-
-  // place container children in an object
-  let children = {};
-  if ((container||{}).childContainerIds) {
-    Object.values(data.containers).map((c) => {
-      container.childContainerIds.forEach((id) => {
-        if (c.id == id) {
-          children[id] = c;
-        }
-      });
-    });
-  }
-
-  if ((editable||{}).containerCheckout) {
-    // Only children of the current container can be checked out.
-    let barcodes = mapFormOptions(children, 'barcode');
-
-    // setCheckoutList(container) {
-    //   // Clear current container field.
-    //   this.setCurrent('containerId', 1)
-    //     .then(()=>this.setCurrent('containerId', null));
-    //   const list = this.state.current.list;
-    //   list[container.coordinate] = container;
-    //   this.setCurrent('list', list);
-    // }
-
-    barcodeField = (
-      <SearchableDropdown
-        name='barcode'
-        label='Barcode'
-        options={barcodes}
-        onUserInput={(name, value) => {
-          value && setCheckoutList(children[value]);
-        }}
-        value={current.containerId}
-        placeHolder='Please Scan or Select Barcode'
-        autoFocus={true}
-      />
-    );
-  }
-
-  let checkout = (
-    <div className={((editable||{}).containerCheckout) ? 'open' : 'closed'}>
-      <FormElement>
-        <StaticElement
-          label='Note'
-          text="Click, Select or Scan Containers to be Unloaded and Press 'Confirm'"
-        />
-        {barcodeField}
-        <ButtonElement
-          label='Confirm'
-          type='button'
-          onUserInput={checkoutContainers}
-        />
-        <StaticElement
-          text={<a onClick={clearAll} style={{cursor: 'pointer'}}>Cancel</a>}
-        />
-      </FormElement>
-    </div>
-
-  );
-
-
-  // TODO: THIS NEED TO BE CONVERTED TO STATES?
-  current.list = {};
-  current.prevCoordinate = null;
-  current.coordinate = null;
-
-  // TODO: This will eventually need to be reworked and cleaned up
-  let display;
-  let column = [];
-  let row = [];
-  let coordinate = 1;
-  if (dimension) {
-    for (let y=1; y <= dimension.y; y++) {
-      column = [];
-      for (let x=1; x <= dimension.x; x++) {
-        let nodeWidth = (500/dimension.x) - (500/dimension.x * 0.08);
-        let nodeStyle = {width: nodeWidth};
-        let nodeClass = 'node';
-        let tooltipTitle = null;
-        let title = null;
-        let dataHtml = 'false';
-        let dataToggle = null;
-        let dataPlacement = null;
-        let draggable = 'false';
-        let onDragStart = null;
-        let onDragOver = allowDrop;
-        let onDrop = drop;
-        let onClick = null;
-
-        if (!select) {
-          if ((coordinates||{})[coordinate]) {
-            if (!loris.userHasPermission('biobank_specimen_view') &&
-                children[coordinates[coordinate]] === undefined) {
-              nodeClass = 'node forbidden';
-            } else {
-              onClick = redirectURL;
-              if (coordinate in current.list) {
-                nodeClass = 'node checkout';
-              } else if (coordinate == current.prevCoordinate) {
-                nodeClass = 'node new';
-              } else {
-                nodeClass = 'node occupied';
-              }
-
-              dataHtml = 'true';
-              dataToggle = 'tooltip';
-              dataPlacement = 'top';
-              // This is to avoid a console error
-              if (children[coordinates[coordinate]]) {
-                tooltipTitle =
-                  '<h5>'+children[coordinates[coordinate]].barcode+'</h5>' +
-                  '<h5>'+options.container.types[children[coordinates[coordinate]].typeId].label+'</h5>' +
-                  '<h5>'+options.container.stati[children[coordinates[coordinate]].statusId].label+'</h5>';
-              }
-              draggable = !loris.userHasPermission('biobank_container_update') ||
-                          editable.loadContainer ||
-                          editable.containerCheckout
-                          ? 'false' : 'true';
-              onDragStart = drag;
-
-              if (editable.containerCheckout) {
-                onClick = (e) => {
-                  let container = data.containers[coordinates[e.target.id]];
-                  setCheckoutList(container);
-                };
-              }
-              if (editable.loadContainer) {
-                onClick = null;
-              }
-            }
-            onDragOver = null;
-            onDrop = null;
-          } else if (loris.userHasPermission('biobank_container_update') &&
-                     !editable.containerCheckout) {
-            nodeClass = coordinate == current.coordinate ?
-              'node selected' : 'node load';
-            title = 'Load...';
-            onClick = (e) => {
-              let containerId = e.target.id;
-              edit('loadContainer')
-              .then(() => editContainer(container))
-              .then(() => setCurrent('coordinate', containerId));
-            };
-          }
-        }
-
-        if (select) {
-          if (coordinate == selectedCoordinate) {
-            nodeClass = 'node occupied';
-          } else if (selectedCoordinate instanceof Array &&
-                     selectedCoordinate.includes(coordinate)) {
-            nodeClass = 'node occupied';
-          } else if (!coordinates) {
-            nodeClass = 'node available';
-            onClick = (e) => setContainer('coordinate', e.target.id);
-          } else if (coordinates) {
-            if (!coordinates[coordinate]) {
-              nodeClass = 'node available';
-              onClick = (e) => setContainer('coordinate', e.target.id);
-            } else if (coordinates[coordinate]) {
-              const childContainer = data.containers[coordinates[coordinate]];
-              const specimen = Object.values(data.specimens)
-                .find((specimen) => specimen.containerId == childContainer.id);
-              let quantity = '';
-              if (specimen) {
-                quantity = `<h5>${specimen.quantity + ' '+options.specimen.units[specimen.unitId].label}</h5>`;
-              }
-              dataHtml = 'true';
-              dataToggle = 'tooltip';
-              dataPlacement = 'top';
-              tooltipTitle =
-                `<h5>${childContainer.barcode}</h5>` +
-                `<h5>${options.container.types[childContainer.typeId].label}</h5>` +
-                quantity +
-                `<h5>${options.container.stati[childContainer.statusId].label}</h5>`;
-            }
-          }
-        }
-
-        let coordinateDisplay;
-        if (dimension.xNum == 1 && dimension.yNum == 1) {
-          coordinateDisplay = x + (dimension.x * (y-1));
-        } else {
-          const xVal = dimension.xNum == 1 ? x : String.fromCharCode(64+x);
-          const yVal = dimension.yNum == 1 ? y : String.fromCharCode(64+y);
-          coordinateDisplay = yVal+''+xVal;
-        }
-
-        column.push(
-          <div
-            key={x}
-            id={coordinate}
-            title={title}
-            className={nodeClass}
-            data-html={dataHtml}
-            data-toggle={dataToggle}
-            data-placement={dataPlacement}
-            data-original-title={tooltipTitle}
-            style={nodeStyle}
-            onClick={onClick}
-            draggable={draggable}
-            onDragStart={onDragStart}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
-          >
-            {coordinateDisplay}
-          </div>
-        );
-
-        coordinate++;
-      }
-
-      let rowHeight = (500/dimension.y) - (500/dimension.y * 0.08);
-      // let rowMargin = (500/dimension.y * 0.04);
-      let rowStyle = {height: rowHeight};
-
-      row.push(
-        <div key={y} className='row' style={rowStyle}>{column}</div>
-      );
-    }
-
-    display = row;
-  }
-
-  const style = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'space-evenly',
-  };
-
-  const checkoutButton = () => {
-    if (!(loris.userHasPermission('biobank_container_update')) ||
-        (data.containers[container.id].childContainerIds.length == 0)) {
-      return;
-    }
-
-    return (
-      <ActionButton
-        title={'Checkout Child Containers'}
-        onClick={() => edit('containerCheckout')}
-        icon={'share'}
-      />
-    );
-  };
-
-  return (
-    <div style={style}>
-      <div>
-        {checkoutButton()}
-        {checkout}
-        {load}
-      </div>
-      <div className='display'>
-        {display}
-      </div>
-      <BarcodePathDisplay container={container}/>
-    </div>
-  );
-}
-
-ContainerDisplay.defaultProps = {
-  current: {},
 };
 
 export default ContainerDisplay;

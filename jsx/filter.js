@@ -8,46 +8,58 @@ import ContainerTab from './containerTab';
 import PoolTab from './poolTab';
 import ShipmentTab from './shipmentTab';
 
-function BiobankFilter(props) {
+function BiobankFilter({
+  data,
+  options,
+  saveBatchEdit,
+  createPool,
+  createSpecimens,
+  updateSpecimens,
+  editSpecimens,
+  createContainers,
+  history,
+  increaseCoordinate,
+  loading,
+}) {
   const specimenTab = (
     <SpecimenTab
-      data={props.data}
-      options={props.options}
-      saveBatchEdit={props.saveBatchEdit}
-      createPool={props.createPool}
-      createSpecimens={props.createSpecimens}
-      updateSpecimens={props.updateSpecimens}
-      editSpecimens={props.editSpecimens}
-      history={props.history}
-      increaseCoordinate={props.increaseCoordinate}
-      loading={props.loading}
+      data={data}
+      options={options}
+      saveBatchEdit={saveBatchEdit}
+      createPool={createPool}
+      createSpecimens={createSpecimens}
+      updateSpecimens={updateSpecimens}
+      editSpecimens={editSpecimens}
+      history={history}
+      increaseCoordinate={increaseCoordinate}
+      loading={loading}
     />
   );
 
   const containerTab = (
     <ContainerTab
-      data={props.data}
-      options={props.options}
-      createContainers={props.createContainers}
-      history={props.history}
-      loading={props.loading}
+      data={data}
+      options={options}
+      createContainers={createContainers}
+      history={history}
+      loading={loading}
     />
   );
 
   const poolTab = (
     <PoolTab
-      data={props.data}
-      options={props.options}
-      createSpecimens={props.createSpecimens}
-      increaseCoordinate={props.increaseCoordinate}
-      loading={props.loading}
+      data={data}
+      options={options}
+      createSpecimens={createSpecimens}
+      increaseCoordinate={increaseCoordinate}
+      loading={loading}
     />
   );
 
   const shipmentTab = (
     <ShipmentTab
-      options={props.options}
-      data={props.data}
+      options={options}
+      data={data}
     />
   );
 

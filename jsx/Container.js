@@ -1,23 +1,25 @@
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {get, post} from './helpers.js';
 
 export function useContainer(initContainer = {}) {
   const [init, setInit] = useState(new Container(initContainer));
-  console.log(init);
-  const [container, setContainer] = useState(new Container(init));
+  const [container, setContainer] = useState(new Container(initContainer));
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    setInit(new Container(initContainer));
+    setContainer(new Container(initContainer));
+  }, [initContainer]);
 
   this.set = (name, value) => setContainer(container.set(name, value));
   this.put = async () => await post(container, `${loris.BaseURL}/biobank/containers/`, 'PUT')
     .then((containers) => {
       setInit(new Container(containers[0]));
-      console.log(containers[0]);
       setContainer(new Container(containers[0]));
     })
     .catch((e) => Promise.reject(setErrors(e)));
   this.remove = (name) => setContainer(container.remove(name));
   this.clear = () => {
-    console.log(init);
     setContainer(init);
     setErrors({});
   };

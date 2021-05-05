@@ -6,7 +6,7 @@ import {ActionButton, List, FlexContainer, FlexItem} from './components';
 import Globals from './globals';
 import Header from './header';
 import ProcessForm from './processForm';
-import ContainerDisplay from './containerDisplay';
+import {ContainerInterface} from './containerDisplay';
 import Loader from 'Loader';
 
 import Container, {useContainer} from './Container.js';
@@ -56,17 +56,18 @@ function BarcodePage({
   ) : (
     <FlexContainer>
       <FlexItem flex={3}>
-        <SimplePanel>
-          <ContainerDisplay
+        <SimplePanel height={70}>
+          <ContainerPanel
             history={history}
             data={data}
             container={container}
+            contHand={contHand}
             options={options}
           />
         </SimplePanel>
       </FlexItem>
       <FlexItem flex={1}>
-        <SimplePanel>
+        <SimplePanel height={70}>
           <ContainerList
             container={container}
             data={data}
@@ -88,9 +89,9 @@ function BarcodePage({
         increaseCoordinate={increaseCoordinate}
         printLabel={printLabel}
       />
-      <FlexContainer height={70}>
+      <FlexContainer>
         <FlexItem flex={1} minWidth={30}>
-          <SimplePanel>
+          <SimplePanel height={70}>
             <Globals
               data={data}
               options={options}
@@ -108,18 +109,63 @@ function BarcodePage({
   );
 }
 
+function ContainerPanel({
+  data,
+  options,
+  history,
+  container,
+  contHand,
+}) {
+  useEffect(() => {
+    $('[data-toggle="tooltip"]').tooltip();
+  });
+
+  const style = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+  };
+
+  return (
+    <div style={style}>
+      <ContainerInterface
+        data={data}
+        options={options}
+        history={history}
+        container={container}
+        contHand={contHand}
+      />
+    </div>
+  );
+}
+
 function ContainerList({container, data = {}}) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const childContainerIds = container.childContainerIds;
 
+  const drag = (e) => {
+    const container = JSON.stringify(data.containers[e.target.id]);
+    e.dataTransfer.setData('text/plain', container);
+  };
+
+  // TODO: This can DEFINITELY be turned into 1 return!
   const getRow = async (id, i) => {
     const child = data.containers[id];
     if (child.coordinate) {
       const coordinate = await new Container(child).getCoordinateLabel(container.dimension);
       return [
-        <Link key={i} to={`/barcode=${child.barcode}`}>{child.barcode}</Link>,
+        <Link
+          key={i}
+          to={`/barcode=${child.barcode}`}
+          id={id}
+          draggable={true}
+          onDragStart={drag}
+        >
+          {child.barcode}
+        </Link>,
         <div>at {coordinate}</div>,
       ];
     } else {
@@ -151,11 +197,6 @@ function ContainerList({container, data = {}}) {
     return <div className='title'>Empty!</div>;
   }
 
-  const drag = (e) => {
-    const container = JSON.stringify(data.containers[e.target.id]);
-    e.dataTransfer.setData('text/plain', container);
-  };
-
   const listStyle = {
     fontSize: '18px',
   };
@@ -184,9 +225,9 @@ export function BarcodePathDisplay({container}) {
       coordinateDisplay = <b>{'-'+(coordinate || 'UAS')}</b>;
     }
     return (
-      <span className='barcodePath'>
+      <span className='barcodePath' key={i}>
         {i != 0 && ': '}
-        <Link key={i} to={`/barcode=${parentContainer.barcode}`}>{parentContainer.barcode}</Link>
+        <Link to={`/barcode=${parentContainer.barcode}`}>{parentContainer.barcode}</Link>
         {coordinateDisplay}
       </span>
     );
@@ -236,7 +277,7 @@ function ProcessPanel({
   if (process.id) {
     panel = (
       <SimplePanel
-        flex={1}
+        height={60}
         title={stage.replace(/^\w/, (c) => c.toUpperCase())}
         edit={allowEdit && edit}
       >

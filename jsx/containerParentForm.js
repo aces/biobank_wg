@@ -2,8 +2,6 @@ import React from 'react';
 import ContainerDisplay from './containerDisplay';
 import PropTypes from 'prop-types';
 
-import {clone} from './helpers';
-
 /**
  * Biobank Container Parent Form
  *
@@ -13,8 +11,13 @@ import {clone} from './helpers';
  * @param {object} props
  * @return {*}
  **/
-function ContainerParentForm(props) {
-  const {data, current, options} = props;
+function ContainerParentForm({
+  display,
+  data,
+  container,
+  contHand,
+  options,
+}) {
   // TODO: there might be a better way to do this.
   const setInheritedProperties = (name, containerId) => {
     if (!containerId) {
@@ -22,14 +25,11 @@ function ContainerParentForm(props) {
     }
 
     const parentContainer = data.containers[containerId];
-    const container = clone(current.container);
-    container.parentContainerId = parentContainer.id;
-    container.coordinate = null;
-    container.temperature = parentContainer.temperature;
-    container.centerId = parentContainer.centerId;
-    container.statusId = parentContainer.statusId;
-
-    props.setCurrent('container', container);
+    contHand.set('parentContainerId', parentContainer.id);
+    // container.coordinate = null;
+    // container.temperature = parentContainer.temperature;
+    // container.centerId = parentContainer.centerId;
+    // container.statusId = parentContainer.statusId;
   };
 
   const removeChildContainers = (object, id) => {
@@ -57,20 +57,20 @@ function ContainerParentForm(props) {
 
   // Delete child containers from options if a container is being placed in a
   // another container.
-  if (props.container) {
-    containerBarcodesNonPrimary = removeChildContainers(
-      containerBarcodesNonPrimary,
-      props.container.id
-    );
-  }
+  // if (props.container) {
+  //   containerBarcodesNonPrimary = removeChildContainers(
+  //     containerBarcodesNonPrimary,
+  //     props.container.id
+  //   );
+  // }
 
   const renderContainerDisplay = () => {
-    if (!(current.container.parentContainerId && props.display)) {
+    if (!(container.parentContainerId && display)) {
       return;
     }
 
     const coordinates = data.containers[
-      current.container.parentContainerId
+      container.parentContainerId
     ].childContainerIds
     .reduce((result, id) => {
       const container = data.containers[id];
@@ -82,17 +82,12 @@ function ContainerParentForm(props) {
 
     return (
       <ContainerDisplay
-        container={props.container}
         data={data}
-        dimensions={options.container.dimensions[data.containers[
-          current.container.parentContainerId
-        ].dimensionId]}
         coordinates={coordinates}
-        parentContainerId={current.container.parentContainerId}
         options={options}
         select={true}
-        selectedCoordinate={current.container.coordinate}
-        setContainer={props.setContainer}
+        selectedCoordinate={container.coordinate}
+        setContainer={contHand.set}
       />
     );
   };
@@ -105,7 +100,7 @@ function ContainerParentForm(props) {
           label="Parent Container Barcode"
           options={containerBarcodesNonPrimary}
           onUserInput={setInheritedProperties}
-          value={current.container.parentContainerId}
+          value={container.parentContainerId}
         />
       </div>
       {renderContainerDisplay()}
@@ -114,7 +109,6 @@ function ContainerParentForm(props) {
 }
 
 ContainerParentForm.propTypes = {
-  setContainer: PropTypes.func.isRequired,
   data: PropTypes.object,
   container: PropTypes.object.isRequired,
   options: PropTypes.object.isRequired,
