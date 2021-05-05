@@ -1,14 +1,16 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {Link} from 'react-router-dom';
 
 import FilterableDataTable from 'FilterableDataTable';
 import {useShipment} from './Shipment';
 import TriggerableModal from 'TriggerableModal';
+import {DataContext} from './biobankIndex';
 
 import {get} from './helpers.js';
 
-function ShipmentTab(props) {
-  const {data, options} = props;
+function ShipmentTab({
+  options,
+}) {
   //   const fetchData = async () => {
   //     const result = await get(`${loris.BaseURL}/biobank/shipments/`);
   //     setShipments(new Map(Object.entries(result)));
@@ -83,7 +85,6 @@ function ShipmentTab(props) {
     <ShipmentForm
       centers={options.centers}
       users={users}
-      data={data}
       updateShipments={updateShipments}
     />,
   ];
@@ -98,12 +99,17 @@ function ShipmentTab(props) {
   );
 }
 
-function ShipmentForm(props) {
+function ShipmentForm({
+  centers,
+  users,
+  updateShipments,
+}) {
   const logIndex = 0;
+  const data = useContext(DataContext);
   const handler = new useShipment();
   const shipment = handler.getShipment();
   const errors = handler.getErrors();
-  const onSubmit = async () => props.updateShipments(await handler.post());
+  const onSubmit = async () => updateShipments(await handler.post());
 
   return (
     <TriggerableModal
@@ -129,7 +135,7 @@ function ShipmentForm(props) {
         label="Container"
         items={shipment.containerIds}
         setItems={handler.setContainerIds}
-        options={props.data.containers}
+        options={data.containers}
         errorMessage={errors.containerIds}
       />
       <SelectElement
@@ -137,7 +143,7 @@ function ShipmentForm(props) {
         label='Destination Center'
         onUserInput={handler.set}
         value={shipment.destinationCenterId}
-        options={props.centers}
+        options={centers}
         errorMessage={errors.destinationCenterId}
         required={true}
       />
@@ -145,14 +151,18 @@ function ShipmentForm(props) {
         log={shipment.logs[logIndex]}
         setLog={(name, value) => handler.setLog(name, value, logIndex)}
         errors={errors.logs[logIndex]}
-        {...props}
+        users={users}
       />
     </TriggerableModal>
   );
 }
 
-function LogForm(props) {
-  const {log, setLog, errors = {}} = props;
+function LogForm({
+  log,
+  setLog,
+  errors = {},
+  users,
+}) {
   return (
     <>
       <TextboxElement
@@ -184,7 +194,7 @@ function LogForm(props) {
         label='Done by'
         onUserInput={setLog}
         value={log.user}
-        options={props.users}
+        options={users}
         errorMessage={errors.user}
         required={true}
       />
