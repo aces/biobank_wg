@@ -45,7 +45,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
      * @var float     $temperature
      * @var int       $statusId
      * @var array     $projectIds
-     * @var string    $shipmentIds
+     * @var string    $shipmentBarcodes
      * @var int       $centerId
      * @var int       $parentContainerId
      * @var array     $childContainerIds
@@ -64,7 +64,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
     private $temperature;
     private $statusId;
     private $projectIds;
-    private $shipmentIds;
+    private $shipmentBarcodes;
     private $centerId;
     private $parentContainerId;
     private $childContainerIds;
@@ -243,13 +243,13 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Sets the ID of the container's current shipment
      *
-     * @param array $shipmentIds the IDs of the container's shipment
+     * @param array $shipmentBarcodes the IDs of the container's shipment
      *
      * @return void
      */
-    public function setShipmentIds(array $shipmentIds) : void
+    public function setShipmentBarcodes(array $shipmentBarcodes) : void
     {
-        $this->shipmentIds = $shipmentIds;
+        $this->shipmentBarcodes = $shipmentBarcodes;
     }
 
     /**
@@ -257,9 +257,9 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @return ?array
      */
-    public function getShipmentIds() : ?array
+    public function getShipmentBarcodes() : ?array
     {
-        return $this->shipmentIds;
+        return $this->shipmentBarcodes;
     }
 
     /**
@@ -460,7 +460,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
         isset($data['temperature'])       && $this->setTemperature((float) ($data['temperature']));
         isset($data['statusId'])          && $this->setStatusId((int) $data['statusId']);
         isset($data['projectIds'])        && $this->setProjectIds($data['projectIds']);
-        isset($data['shipmentIds'])       && $this->setShipmentIds($data['shipmentIds']);
+        isset($data['shipmentBarcodes'])       && $this->setShipmentBarcodes($data['shipmentBarcodes']);
         isset($data['centerId'])          && $this->setCenterId((int) $data['centerId']);
         isset($data['parentContainerId']) && $this->setParentContainerId((int) $data['parentContainerId']);
         isset($data['childContainerIds']) && $this->setChildContainerIds($data['childContainerIds']);
@@ -504,7 +504,7 @@ class Container implements \JsonSerializable, \LORIS\Data\DataInstance
                 'temperature'       => $this->temperature,
                 'statusId'          => $this->statusId,
                 'projectIds'        => $this->projectIds,
-                'shipmentIds'       => $this->shipmentIds,
+                'shipmentBarcodes'       => $this->shipmentBarcodes,
                 'centerId'          => $this->centerId,
                 'parentContainerId' => $this->parentContainerId,
                 'childContainerIds' => $this->childContainerIds,

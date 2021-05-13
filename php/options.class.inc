@@ -152,7 +152,7 @@ class Options implements RequestHandlerInterface
         // XXX: This should eventually be replaced by a call directly to a
         // User endpoint or User controller that will be able to provide
         // User Objects.
-        $query     = 'SELECT ID as id, UserID as label FROM users';
+        $query     = 'SELECT ID as id, Real_name as label FROM users';
         $users = $db->pselectWithIndexKey($query, array(), 'id');
 
         // XXX: This should eventually be replaced by a call directly to a
@@ -185,7 +185,10 @@ class Options implements RequestHandlerInterface
             }
         }
 
-        $statuses = ['statuses' => $shipDAO->getStatuses()];
+        $shipment = [
+          'statuses' => $shipDAO->getStatuses(),
+          'types'    => $shipDAO->getTypes(),
+        ];
         return array(
                 'candidates'        => $candidates,
                 'diagnoses'         => $diagnoses,
@@ -198,7 +201,7 @@ class Options implements RequestHandlerInterface
                 'sessionCenters'    => $sessionCenters,
                 'container'         => $contCont->getOptions(),
                 'specimen'          => $specCont->getOptions(),
-                'shipment'          => $statuses,
+                'shipment'          => $shipment,
                );
     }
 }

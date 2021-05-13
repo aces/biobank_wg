@@ -36,7 +36,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * These properties describe a shipment entity.
      *
-     * @var int       $id
+     * @var string    $barcode
      * @var string    $centerId
      * @var string    $status
      * @var string    $user
@@ -44,7 +44,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
      * @var \DateTime $date
      * @var \DateTime $time
      */
-    public $id;
+    public $barcode;
     public $centerId;
     public $status;
     public $user;
@@ -57,7 +57,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
      */
     function __construct(array $data)
     {
-        $this->id = $data['id'] ?? null;
+        $this->barcode = $data['barcode'] ?? null;
         $this->centerId = $data['centerId'] ?? null;
         $this->status = $data['status'] ?? null;
         $this->user = $data['user'] ?? null;
@@ -69,13 +69,13 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Sets the shipment's ID
      *
-     * @param int $id the shipment's ID
+     * @param int $barcode the shipment's ID
      *
      * @return void
      */
-    private function setId(int $id) : void
+    private function setBarcode(int $barcode) : void
     {
-        $this->id = $id;
+        $this->barcode = $barcode;
     }
 
     /**
@@ -83,9 +83,9 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @return ?int
      */
-    public function getId() : ?int
+    public function getBarcode() : ?int
     {
-        return $this->id;
+        return $this->barcode;
     }
 
     /**
@@ -213,7 +213,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
     public function jsonSerialize() : array
     {
         return array(
-                'id'          => $this->id,
+                'barcode'     => $this->barcode,
                 'centerId'    => $this->centerId,
                 'status'      => $this->status,
                 'user'        => $this->user,

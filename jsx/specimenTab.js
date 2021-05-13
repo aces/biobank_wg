@@ -48,6 +48,8 @@ class SpecimenTab extends Component {
         return options.container.stati[value].label;
       case 'Projects':
         return value.map((id) => options.projects[id]);
+      case 'Site':
+        return options.centers[value];
       default:
         return value;
     }
@@ -144,7 +146,7 @@ class SpecimenTab extends Component {
         specimen.poolId ? (data.pools[specimen.poolId]||{}).label : null,
         container.statusId,
         container.projectIds,
-        container.center,
+        container.centerId,
         specimen.collection.date,
         specimen.collection.time,
         (specimen.preparation||{}).time,

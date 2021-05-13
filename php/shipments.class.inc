@@ -95,6 +95,7 @@ class Shipments implements RequestHandlerInterface
         case 'POST':
             return $this->_handlePOST($request);
         case 'PUT':
+            return $this->_handlePUT($request);
         case 'OPTIONS':
             return (new \LORIS\Http\Response())
                 ->withHeader('Allow', $this->allowedMethods());
@@ -127,6 +128,17 @@ class Shipments implements RequestHandlerInterface
             return new \LORIS\Http\Response\JsonResponse($shipmentHandler->getErrors(), 422);
         }
         
-        return new \LORIS\Http\Response\JsonResponse($shipmentHandler->createInstance(), 200);
+        return new \LORIS\Http\Response\JsonResponse([$shipmentHandler->createInstance()], 200);
+    }
+
+    private function _handlePUT(ServerRequestInterface $request) : ResponseInterface
+    {
+        $shipmentArray   = json_decode($request->getBody()->getContents(), true);
+        $shipmentHandler = new ShipmentHandler($shipmentArray, $this->db, $this->user);
+        if (!$shipmentHandler->isValid()) {
+            return new \LORIS\Http\Response\JsonResponse($shipmentHandler->getErrors(), 422);
+        }
+        
+        return new \LORIS\Http\Response\JsonResponse([$shipmentHandler->createInstance()], 200);
     }
 }

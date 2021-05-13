@@ -85,6 +85,7 @@ class ShipmentHandler
      */
     public function updateInstance(array $shipmentArray) : Shipment
     {
+        print_r($shipmentArray);
         $this->validatePermission('update');
         $shipment = new Shipment($shipmentArray);
         $this->validateInstance($shipment);
@@ -154,6 +155,7 @@ class ShipmentHandler
     {
         $errors = [];
         $errors = $this->validateBarcode($shipment, $errors);
+        $errors = $this->validateType($shipment, $errors);
         $errors = $this->validateDestinationCenterId($shipment, $errors);
         $errors = $this->validateLogs($shipment, $errors);
         $errors = $this->validateContainers($shipment, $errors);
@@ -176,6 +178,26 @@ class ShipmentHandler
         }
         if (!empty($error)) {
             $errors['barcode'] = $error;
+        }
+        return $errors;
+    }
+
+    /**
+     * Validates Shipment Object Type Id.
+     *
+     * @param Shipment $shipment
+     * @param array    $errors
+     *
+     * @return array
+     */
+    private function validateType(Shipment $shipment, array $errors) : array
+    {
+        $error = '';
+        if (empty($shipment->type)) {
+            $error .= 'Shipment Type is required. ';
+        }
+        if (!empty($error)) {
+            $errors['type'] = $error;
         }
         return $errors;
     }
@@ -232,13 +254,30 @@ class ShipmentHandler
                 $errors[$field] = 'All Containers must be at the same Center.';
                 return $errors;
             }
+
+            // TODO: Check that containers are not already associated with an active
+            if (!$shipment->getId()) {
+              if (
+              foreach ($container->getShipmentBarcodes() as $shipmentId) {
+                $containerShipment = $this->dao->getInstanceFromBarcode($shipmentId);
+                if ($containerShipment->getActive()) {
+                  $errors[$field] = $containerShipment->getBarcode().' is already
+                  associated with an active shipment';
+                }
+              };
+            }
         }
 
         // TODO: this could maybe be improved since it only checks 1 shipment.
+        // TODO: This check needs to be reworked because it will only apply for
+        // the shipment creation.
         // Check that the containers are at the same center as the shipment.
-        if ($shipment->logs[0]->centerId !== $container1->getCenterID()) {
-            $error .= 'Containers must be at the same site at the shipment. ';
-        }
+        // if ($shipment->logs[0]->centerId !== $container1->getCenterID()) {
+        //     $error .= 'Containers must be at the same site as the shipment. ';
+        // }
+
+        // shipment
+       
         
         if (!empty($error)) {
             $errors[$field] = $error;

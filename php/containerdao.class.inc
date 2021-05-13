@@ -140,7 +140,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                      bcd.ZNumerical as zNum,
                      bc.ContainerStatusID,
                      GROUP_CONCAT(DISTINCT(bcpr.ProjectID)) as ProjectIDs,
-                     GROUP_CONCAT(DISTINCT(bcsr.ShipmentID)) as ShipmentIDs,
+                     GROUP_CONCAT(DISTINCT(s.Barcode)) as ShipmentBarcodes,
                      bc.Temperature,
                      bc.CenterID as CenterID,
                      bcp.ParentContainerID,
@@ -164,6 +164,8 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
                     ON bc.ContainerID=bcpr.ContainerID
                   LEFT JOIN biobank_container_shipment_rel bcsr
                     ON bc.ContainerID=bcsr.ContainerID
+                  LEFT JOIN shipment s
+                    ON bcsr.ShipmentID=s.ShipmentID
                   LEFT JOIN biobank_specimen bs
                     ON bc.ContainerID=bs.ContainerID
                   LEFT JOIN psc 
@@ -183,8 +185,8 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
           // TODO: This whole section needs to be redone more like the shipment module
           $childContainerIds = $containerRow['ChildContainerIDs'] ? explode(',', $containerRow['ChildContainerIDs']) : [];
           $projectIds        = explode(',', $containerRow['ProjectIDs']);
-          $shipmentIds       = $containerRow['ShipmentIDs'] ? explode(',', $containerRow['ShipmentIDs']) : [];
-          $containers[$id] = $this->getInstanceFromSQL($containerRow, $childContainerIds, $projectIds, $shipmentIds);
+          $shipmentBarcodes       = $containerRow['ShipmentBarcodes'] ? explode(',', $containerRow['ShipmentBarcodes']) : [];
+          $containers[$id] = $this->getInstanceFromSQL($containerRow, $childContainerIds, $projectIds, $shipmentBarcodes);
         }
 
         return $containers;
@@ -598,7 +600,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
      *
      * @return Container
      */
-    private function getInstanceFromSQL(array $data, ?array $childContainerIds, ?array $projectIds, ?array $shipmentIds) : Container
+    private function getInstanceFromSQL(array $data, ?array $childContainerIds, ?array $projectIds, ?array $shipmentBarcodes) : Container
     {
         $container = $this->getInstance();
         isset($data['ContainerID'])          && $container->setId((int) $data['ContainerID']);
@@ -617,7 +619,7 @@ class ContainerDAO extends \LORIS\Data\ProvisionerInstance
         isset($data['Temperature'])          && $container->setTemperature((float) $data['Temperature']);
         isset($data['ContainerStatusID'])    && $container->setStatusId((int) $data['ContainerStatusID']);
         isset($projectIds)                   && $container->setProjectIds($projectIds);
-        isset($shipmentIds)                  && $container->setShipmentIds($shipmentIds);
+        isset($shipmentBarcodes)                  && $container->setShipmentBarcodes($shipmentBarcodes);
         $container->setCenterId((int) $data['CenterID']);
         isset($data['ParentContainerID'])    && $container->setParentContainerId((int) $data['ParentContainerID']);
         isset($childContainerIds)            && $container->setChildContainerIds($childContainerIds);

@@ -86,9 +86,12 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
     {
         $query = "SELECT s.ShipmentID as id,
                          s.Barcode as barcode,
+                         st.Label as type,
                          s.DestinationCenterID as destinationCenterId,
                          GROUP_CONCAT(bc.ContainerId) as containerIds
                   FROM shipment s
+                  LEFT JOIN shipment_type st
+                    USING (ShipmentTypeID)
                   LEFT JOIN psc psc
                     ON (s.DestinationCenterID=psc.CenterID)
                   LEFT JOIN biobank_container_shipment_rel bcsr
@@ -133,15 +136,15 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
                   LEFT JOIN psc
                     ON (sl.CenterID=psc.CenterID)
                   LEFT JOIN users u
-                    ON (sl.UserID=u.UserID)
+                    ON (sl.UserID=u.ID)
                   LEFT JOIN shipment_status ss
                     ON (sl.StatusID=ss.StatusID)
                   ORDER BY date, time";
-        $logRows = $this->db->pselectWithIndexKey($query, [], 'barcode');
+        $logRows = $this->db->pselect($query, []);
 
         $logs = [];
-        foreach ($logRows as $barcode => $logRow) {
-            $logs[$barcode][] = $logRow;
+        foreach ($logRows as $logRow) {
+            $logs[$logRow['barcode']][] = $logRow;
         }
         return $logs;
     }
@@ -160,6 +163,12 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
     public function getStatuses() : array
     {
         $query = "SELECT Label as label, Label FROM shipment_status";
+        return $this->db->pselectColWithIndexKey($query, [], 'label');
+    }
+
+    public function getTypes() : array
+    {
+        $query = "SELECT Label as label, Label FROM shipment_type";
         return $this->db->pselectColWithIndexKey($query, [], 'label');
     }
 
@@ -234,9 +243,13 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      */
     private function getSQLFromInstance(Shipment $shipment) : array
     {
+        $typeId = $this->db->pselectOne(
+            'SELECT ShipmentTypeID from shipment_type WHERE Label=:l', ['l' => $shipment->type]
+        );
         return [
                 'ShipmentID'          => $shipment->id,
                 'Barcode'             => $shipment->barcode,
+                'ShipmentTypeID'      => $typeId,
                 'DestinationCenterID' => $shipment->destinationCenterId,
                ];
     }
@@ -249,7 +262,7 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
             'SELECT StatusID from shipment_status WHERE Label=:l', ['l' => $log->status]
         );
         $userId = $this->db->pselectOne(
-            'SELECT ID FROM users WHERE UserID=:u', ['u' => $log->user]
+            'SELECT ID FROM users WHERE Real_name=:u', ['u' => $log->user]
         );
 
         return [

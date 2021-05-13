@@ -3,18 +3,19 @@ import {Link} from 'react-router-dom';
 
 import FilterableDataTable from 'FilterableDataTable';
 import {useShipment} from './Shipment';
+// import Container from './Container';
 import TriggerableModal from 'TriggerableModal';
 import {DataContext} from './biobankIndex';
 
 import {get} from './helpers.js';
 
+// TODO:
+// - Datatable isn't updating when new entry is passed!
+// - For some reason, receiving the specimen is adding an extra log for creation!
+
 function ShipmentTab({
   options,
 }) {
-  //   const fetchData = async () => {
-  //     const result = await get(`${loris.BaseURL}/biobank/shipments/`);
-  //     setShipments(new Map(Object.entries(result)));
-  //   };
   const [shipments, setShipments] = useState({});
 
   // TODO: Look into this for standardization: https://www.robinwieruch.de/react-hooks-fetch-data
@@ -26,10 +27,12 @@ function ShipmentTab({
     fetchData();
   }, []);
 
-  const updateShipments = async (shipment) => {
-    setShipments({
-      ...shipments,
-      [shipment.barcode]: shipment,
+  const updateShipments = (updatedShipments) => {
+    updatedShipments.forEach((shipment) => {
+      setShipments({
+        ...shipments,
+        [shipment.barcode]: shipment,
+      });
     });
   };
 
@@ -37,6 +40,17 @@ function ShipmentTab({
     switch (column) {
       case 'Barcode':
         return <Link to={`/barcode=${value}`}>{value}</Link>;
+      case 'Actions':
+        if (row['Status'] === 'received') {
+          return;
+        }
+        return (
+          <ReceiveShipment
+            shipment={shipments[row['Barcode']]}
+            users={users}
+            updateShipments={updateShipments}
+          />
+        );
       default:
         return value;
     }
@@ -46,6 +60,7 @@ function ShipmentTab({
     return [
       shipment.id,
       shipment.barcode,
+      shipment.type,
       shipment.status,
       options.centers[shipment.originCenterId],
       options.centers[shipment.destinationCenterId],
@@ -64,6 +79,11 @@ function ShipmentTab({
       name: 'barcode',
       type: 'text',
     }},
+    {label: 'Type', show: true, filter: {
+      name: 'type',
+      type: 'select',
+      options: options.shipment.types,
+    }},
     {label: 'Status', show: true, filter: {
       name: 'status',
       type: 'select',
@@ -79,11 +99,13 @@ function ShipmentTab({
       type: 'select',
       options: options.centers,
     }},
+    {label: 'Actions', show: true},
   ];
 
   const forms = [
-    <ShipmentForm
+    <CreateShipment
       centers={options.centers}
+      types={options.shipment.types}
       users={users}
       updateShipments={updateShipments}
     />,
@@ -99,8 +121,9 @@ function ShipmentTab({
   );
 }
 
-function ShipmentForm({
+function CreateShipment({
   centers,
+  types,
   users,
   updateShipments,
 }) {
@@ -109,12 +132,25 @@ function ShipmentForm({
   const handler = new useShipment();
   const shipment = handler.getShipment();
   const errors = handler.getErrors();
-  const onSubmit = async () => updateShipments(await handler.post());
+  const onSubmit = async () => await handler.post();
+  // updateShipments(shipments);
+  const onOpen = () => {
+    handler.addLog({status: 'created'});
+  };
+
+  // If the associated shipments containers change, update the site of the log.
+  useEffect(() => {
+    if (shipment.containerIds.length === 1) {
+      const container = data.containers[shipment.containerIds[0]];
+      handler.setLog('centerId', container.centerId, logIndex);
+    }
+  }, [shipment.containerIds]);
 
   return (
     <TriggerableModal
       label='Create Shipment'
       title='Create Shipment'
+      onUserInput={onOpen}
       onSubmit={onSubmit}
       onClose={handler.clear}
     >
@@ -128,6 +164,15 @@ function ShipmentForm({
         onUserInput={handler.set}
         value={shipment.barcode}
         errorMessage={errors.barcode}
+        required={true}
+      />
+      <SelectElement
+        name='type'
+        label='Container Type'
+        onUserInput={handler.set}
+        value={shipment.type}
+        options={types}
+        errorMessage={errors.type}
         required={true}
       />
       <InputList
@@ -147,7 +192,7 @@ function ShipmentForm({
         errorMessage={errors.destinationCenterId}
         required={true}
       />
-      <LogForm
+      <ShipmentLogForm
         log={shipment.logs[logIndex]}
         setLog={(name, value) => handler.setLog(name, value, logIndex)}
         errors={errors.logs[logIndex]}
@@ -157,7 +202,56 @@ function ShipmentForm({
   );
 }
 
-function LogForm({
+function ReceiveShipment({
+  shipment,
+  users,
+  updateShipments,
+}) {
+  const handler = new useShipment(shipment);
+  // const data = useContext(DataContext);
+  const logIndex = handler.getShipment().logs.length-1;
+  const onSubmit = async () => {
+    const shipments = await handler.post();
+    updateShipments(shipments[0]);
+    // return await Promise.all(shipment.containerIds.map((containerId) => {
+    //   const container = new Container(data.containers[containerId]);
+    //   container.centerId = shipment.destinationCenterId;
+    //   return container.put();
+    // }));
+  };
+  const onOpen = () => {
+    handler.addLog({status: 'received', centerId: shipment.destinationCenterId});
+  };
+
+  // TODO: At the top of this form, it wouldn't hurt to have a ShipmentSummary
+  // to display the pertinent information from the shipment!
+  return (
+    <TriggerableModal
+      label='Receive Shipment'
+      title='Receive Shipment'
+      onUserInput={onOpen}
+      onSubmit={onSubmit}
+      onClose={handler.clear}
+    >
+      <StaticElement
+        label='Barcode'
+        text={handler.getShipment().barcode}
+      />
+      <StaticElement
+        label='Origin Center'
+        text={handler.getShipment().logs[0].centerId}
+      />
+      <ShipmentLogForm
+        log={handler.getShipment().logs[logIndex]}
+        setLog={(name, value) => handler.setLog(name, value, logIndex)}
+        errors={handler.getErrors().logs[logIndex]}
+        users={users}
+      />
+    </TriggerableModal>
+  );
+};
+
+function ShipmentLogForm({
   log,
   setLog,
   errors = {},

@@ -22,6 +22,8 @@ function ContainerTab({
         return options.container.stati[value].label;
       case 'Projects':
         return value.map((id) => options.projects[id]);
+      case 'Site':
+        return options.centers[value];
       case 'Parent Barcode':
         return (value && data.containers[value].barcode);
       default:
@@ -88,7 +90,7 @@ function ContainerTab({
         container.typeId,
         container.statusId,
         container.projectIds,
-        options.centers[container.centerId],
+        container.centerId,
         container.parentContainerId,
       ];
     }
@@ -142,7 +144,6 @@ function ContainerTab({
       />
       <Search
         title='Go To Container'
-        show={editable.searchContainer}
         barcodes={barcodesNonPrimary}
         history={history}
       />

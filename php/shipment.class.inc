@@ -38,12 +38,14 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
      *
      * @var string  $id
      * @var string  $barcode
+     * @var string  $type
      * @var string  $destinationCenterId
      * @var array   $containerIds
      * @var array   $logs
      */
     public $id;
     public $barcode;
+    public $type;
     public $destinationCenterId;
     public $containerIds;
     public $logs;
@@ -55,6 +57,7 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     {
         $this->id = $data['id'] ?? null;
         $this->barcode = $data['barcode'] ?? null;
+        $this->type = $data['type'] ?? null;
         $this->destinationCenterId = $data['destinationCenterId'] ?? null;
         $this->containerIds = $data['containerIds'] ?? null;
         $this->setLogs($data['logs']) ?? null;
@@ -102,6 +105,28 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     public function getBarcode() : ?string
     {
         return $this->barcode;
+    }
+
+    /**
+     * Sets the type of the shipment
+     *
+     * @param string $type the shipment's type
+     *
+     * @return void
+     */
+    private function setType(string $type) : void
+    {
+        $this->type = $type;
+    }
+
+    /**
+     * Gets the type of the shipment
+     *
+     * @return ?string
+     */
+    public function getType() : ?string
+    {
+        return $this->type;
     }
 
     /**
@@ -175,6 +200,11 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
         }
     }
 
+    public function getActive() : ?bool
+    {
+        return $this->getStatus() !== 'received';
+    }
+
     /**
      * Sets the containers for the shipment
      *
@@ -243,6 +273,7 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
         return array(
                 'id'                  => $this->id,
                 'barcode'             => $this->barcode,
+                'type'                => $this->type,
                 'originCenterId'      => $this->getOriginCenterId(),
                 'destinationCenterId' => $this->destinationCenterId,
                 'containerIds'        => $this->containerIds,
