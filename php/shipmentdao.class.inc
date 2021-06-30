@@ -129,7 +129,8 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
                          ss.Label as status,
                          sl.Temperature as temperature,
                          sl.Date as date,
-                         sl.Time as time
+                         sl.Time as time,
+                         sl.Comments as comments
                   FROM shipment_log sl
                   LEFT JOIN shipment s
                     ON (sl.ShipmentID=s.ShipmentID)
@@ -179,10 +180,10 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
      * @param Shipment $shipment The Shipment Object to be saved the
      *                           database.
      *
-     * @return Shipment $shipment The Shipment Object that was saved
-                                  to the database.
+     * @return array The Shipment Objects that were saved
+     *               to the database.
      */
-    public function saveInstance(Shipment $shipment) : Shipment
+    public function saveInstance(Shipment $shipment) : array
     {
         //TODO: This should probably have a try catch block of sorts.
         // Converts Shipment Object into SQL format and inserts into database.
@@ -202,15 +203,48 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
             );
         }
 
+        // XXX: This following commands should perhaps be moved to the handler
+        // instead of the dao.
+        $containerDAO = new ContainerDAO($this->db);
+
+        // XXX: Most of this will likely go into the controller instead of the DAO.
+        // Checks out each listed container from their respective parent, if it
+        // exists
+        $updatedContainers = [];
+        // TODO: Change to if "First".
+        if (!$shipment->getId()) {
+            foreach($shipment->containerIds as $containerId) {
+                $container = $containerDAO->getInstanceFromId((int) $containerId);
+                $container->setParentContainerId(null);
+                $updatedContainers = array_merge($updatedContainers, $containerDAO->updateInstance($container));
+            }
+        }
+        // TODO: This will later need to be replaced by a more robust system
+        // that relies on the log type, such as active, locked, final, etc.
+
         $containerIds = $this->getAllContainerIds($shipment);
         foreach($containerIds as $containerId) {
-            $this->db->insertOnDuplicateUpdate(
-                'biobank_container_shipment_rel',
-                ['ShipmentID' => $shipmentId, 'ContainerID' => $containerId]
-            );
+            // TODO: Change to if "Final"
+            if ($shipment->getId()) {
+              // places all containers at destination center
+              $container = $containerDAO->getInstanceFromId((int) $containerId);
+              $container->setCenterId((int) $shipment->destinationCenterId);
+              $updatedContainers = array_merge($updatedContainers, $containerDAO->updateInstance($container));
+            }
+            // TODO: Change to if "First"
+            if (!$shipment->getId()) {
+              $this->db->insertOnDuplicateUpdate(
+                  'biobank_container_shipment_rel',
+                  ['ShipmentID' => $shipmentId, 'ContainerID' => $containerId]
+              );
+              $updatedContainers[] = $containerDAO->getInstanceFromId((int) $containerId);
+            }
         }
 
-        return $this->getInstanceFromBarcode($shipment->barcode);
+        return [
+          'shipments'  => [$this->getInstanceFromBarcode($shipment->barcode)],
+          'containers' => $updatedContainers,
+        ];
     }
 
     private function getAllContainerIds(Shipment $shipment) : array
@@ -219,6 +253,8 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
         $childContainerIds = [];
         foreach($shipment->containerIds as $containerId) {
             $container = $containerDAO->getInstanceFromId((int) $containerId);
+            $containerDAO->updateInstance($container)[0];
+
             $childContainerIds = array_merge(
                 $childContainerIds,
                 $containerDAO->getAllChildContainerIds($container)
@@ -229,6 +265,13 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
             $shipment->containerIds
         );
         return array_unique($allContainerIds);
+    }
+
+    private function removeContainersFromParents($shipment) : void
+    {
+      foreach($shipment->getContainerIds() as $containerId) {
+
+      }
     }
 
     /**
@@ -269,10 +312,11 @@ class ShipmentDAO extends \LORIS\Data\ProvisionerInstance
                 'ShipmentID'  => $shipmentId,
                 'CenterID'    => $log->centerId,
                 'StatusID'    => $statusId,
+                'UserID'      => $userId,
                 'Temperature' => $log->temperature,
                 'Date'        => (new \DateTime($log->date))->format('Y-m-d H:i'),
                 'Time'        => (new \DateTime($log->time))->format('Y-m-d H:i'),
-                'UserID'      => $userId,
+                'Comments'    => $log->comments,
                ];
     }
 }

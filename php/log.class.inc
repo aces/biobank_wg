@@ -43,6 +43,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
      * @var string    $temperature
      * @var \DateTime $date
      * @var \DateTime $time
+     * @var string    $comments
      */
     public $barcode;
     public $centerId;
@@ -51,6 +52,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
     public $temperature;
     public $date;
     public $time;
+    public $comments;
 
     /**
      * Initiliazes a new instance of the Log Class
@@ -64,6 +66,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
         $this->temperature = $data['temperature'] ?? null;
         $this->date = $data['date'] ?? null;
         $this->time = $data['time'] ?? null;
+        $this->comments = $data['comments'] ?? null;
     }
 
     /**
@@ -194,6 +197,14 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
         return $this->time;
     }
 
+    /**
+     * @return ?string
+     */
+    public function getComments() : ?string
+    {
+        return $this->comments;
+    }
+
     /**                                                                         
      * A wrapper function for the jsonSerialize method of the Log Instance 
      * Class. This converts the Log Instance into an array.                
@@ -220,6 +231,7 @@ class Log implements \JsonSerializable, \LORIS\Data\DataInstance
                 'temperature' => $this->temperature,
                 'date'        => $this->date,
                 'time'        => $this->time,
+                'comments'    => $this->comments,
                );
     }
 

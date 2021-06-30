@@ -1,28 +1,34 @@
-import React, {useState, useEffect, useContext} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Link} from 'react-router-dom';
 
 import FilterableDataTable from 'FilterableDataTable';
 import {useShipment} from './Shipment';
 // import Container from './Container';
 import TriggerableModal from 'TriggerableModal';
-import {DataContext} from './biobankIndex';
 
 import {get} from './helpers.js';
 
 // TODO:
-// - Datatable isn't updating when new entry is passed!
-// - For some reason, receiving the specimen is adding an extra log for creation!
+// - Make sure all subcontainers are loaded into shipment
+// - Make sure all containers change center when shipment is received
+// - Make sure to block all
 
 function ShipmentTab({
+  data,
+  setData,
   options,
 }) {
   const [shipments, setShipments] = useState({});
+  const users = {};
+  // TODO: There has to be a better way to query this!!!
+  Object.values(options.users).forEach((user) => {
+    users[user.label] = user.label;
+  });
 
   // TODO: Look into this for standardization: https://www.robinwieruch.de/react-hooks-fetch-data
   useEffect(() => {
     const fetchData = async () => {
-      const result = await get(`${loris.BaseURL}/biobank/shipments/`);
-      setShipments(result);
+      setShipments(await get(`${loris.BaseURL}/biobank/shipments/`));
     };
     fetchData();
   }, []);
@@ -39,20 +45,35 @@ function ShipmentTab({
   const formatShipmentColumns = (column, value, row) => {
     switch (column) {
       case 'Barcode':
-        return <Link to={`/barcode=${value}`}>{value}</Link>;
-      case 'Actions':
-        if (row['Status'] === 'received') {
-          return;
-        }
         return (
-          <ReceiveShipment
-            shipment={shipments[row['Barcode']]}
-            users={users}
-            updateShipments={updateShipments}
-          />
+          <td>
+            <TriggerableModal
+              label={value}
+              title={value+' Information'}
+            >
+              <ShipmentInformation
+                shipment={shipments[value]}
+                containers={data.containers}
+                centers={options.centers}
+              />
+            </TriggerableModal>
+          </td>
         );
+      case 'Actions':
+        if (row['Status'] !== 'received') {
+          return (
+            <td>
+              <ReceiveShipment
+                shipment={shipments[row['Barcode']]}
+                users={users}
+                updateShipments={updateShipments}
+                setData={setData}
+              />
+            </td>
+          );
+        }
       default:
-        return value;
+        return <td>{value}</td>;
     }
   };
 
@@ -65,12 +86,6 @@ function ShipmentTab({
       options.centers[shipment.originCenterId],
       options.centers[shipment.destinationCenterId],
     ];
-  });
-
-  const users = {};
-  // TODO: There has to be a better way to query this!!!
-  Object.values(options.users).forEach((user) => {
-    users[user.label] = user.label;
   });
 
   const fields = [
@@ -104,10 +119,12 @@ function ShipmentTab({
 
   const forms = [
     <CreateShipment
+      data={data}
       centers={options.centers}
       types={options.shipment.types}
       users={users}
       updateShipments={updateShipments}
+      setData={setData}
     />,
   ];
 
@@ -121,19 +138,103 @@ function ShipmentTab({
   );
 }
 
+function ShipmentInformation({
+  shipment,
+  containers = {},
+  centers,
+}) {
+  const logs = shipment.logs.map((log, i) => {
+    return (
+    <>
+      <h4>Shipment Log {i+1}</h4>
+      <HorizontalRule/>
+      <StaticElement
+        label='Center'
+        text={centers[log.centerId]}
+      />
+      <StaticElement
+        label='Status'
+        text={log.status}
+      />
+      <StaticElement
+        label='Temperature'
+        text={log.temperature}
+      />
+      <StaticElement
+        label='Date'
+        text={log.date}
+      />
+      <StaticElement
+        label='Time'
+        text={log.time}
+      />
+      <StaticElement
+        label='User'
+        text={log.user}
+      />
+      <StaticElement
+        label='Comments'
+        text={log.comments}
+      />
+    </>
+    );
+  });
+
+  const containerBarcodes = shipment.containerIds.map((id, i) => {
+    const barcode = (containers[id] || {}).barcode;
+    return (
+      <Link
+        key={i}
+        to={`/barcode=${barcode}`}
+      >
+        {barcode}
+      </Link>
+    );
+  }).reduce((prev, curr) => [prev, ', ', curr]);
+  return (
+    <>
+      <StaticElement
+        label='Barcode'
+        text={shipment.barcode}
+      />
+      <StaticElement
+        label='Type'
+        text={shipment.type}
+      />
+      <StaticElement
+        label='Containers'
+        text={containerBarcodes}
+      />
+      <StaticElement
+        label='Origin Center'
+        text={centers[shipment.logs[0].centerId]}
+      />
+      <StaticElement
+        label='Destination Center'
+        text={centers[shipment.destinationCenterId]}
+      />
+      {logs}
+    </>
+  );
+}
+
 function CreateShipment({
+  data,
   centers,
   types,
   users,
   updateShipments,
+  setData,
 }) {
   const logIndex = 0;
-  const data = useContext(DataContext);
   const handler = new useShipment();
   const shipment = handler.getShipment();
   const errors = handler.getErrors();
-  const onSubmit = async () => await handler.post();
-  // updateShipments(shipments);
+  const onSubmit = async () => {
+    const entities = await handler.post();
+    updateShipments(entities.shipments);
+    await setData('containers', entities.containers);
+  };
   const onOpen = () => {
     handler.addLog({status: 'created'});
   };
@@ -156,7 +257,9 @@ function CreateShipment({
     >
       <StaticElement
         label='Note'
-        text='This is how to to use this form!'
+        text="Any container or specimen added to this form will be dissassociated
+        from its parent. Any children of the containers listed will also be added
+        to the shipment."
       />
       <TextboxElement
         name='barcode'
@@ -206,18 +309,13 @@ function ReceiveShipment({
   shipment,
   users,
   updateShipments,
+  setData,
 }) {
   const handler = new useShipment(shipment);
-  // const data = useContext(DataContext);
   const logIndex = handler.getShipment().logs.length-1;
-  const onSubmit = async () => {
-    const shipments = await handler.post();
-    updateShipments(shipments[0]);
-    // return await Promise.all(shipment.containerIds.map((containerId) => {
-    //   const container = new Container(data.containers[containerId]);
-    //   container.centerId = shipment.destinationCenterId;
-    //   return container.put();
-    // }));
+  const onSuccess = ({shipments, containers}) => {
+    updateShipments(shipments);
+    setData('containers', containers);
   };
   const onOpen = () => {
     handler.addLog({status: 'received', centerId: shipment.destinationCenterId});
@@ -228,19 +326,12 @@ function ReceiveShipment({
   return (
     <TriggerableModal
       label='Receive Shipment'
-      title='Receive Shipment'
+      title={'Receive Shipment '+shipment.barcode}
       onUserInput={onOpen}
-      onSubmit={onSubmit}
+      onSubmit={handler.post}
+      onSuccess={onSuccess}
       onClose={handler.clear}
     >
-      <StaticElement
-        label='Barcode'
-        text={handler.getShipment().barcode}
-      />
-      <StaticElement
-        label='Origin Center'
-        text={handler.getShipment().logs[0].centerId}
-      />
       <ShipmentLogForm
         log={handler.getShipment().logs[logIndex]}
         setLog={(name, value) => handler.setLog(name, value, logIndex)}
@@ -249,7 +340,7 @@ function ReceiveShipment({
       />
     </TriggerableModal>
   );
-};
+}
 
 function ShipmentLogForm({
   log,
@@ -291,6 +382,13 @@ function ShipmentLogForm({
         options={users}
         errorMessage={errors.user}
         required={true}
+      />
+      <TextareaElement
+        name='comments'
+        label='Comments'
+        onUserInput={setLog}
+        value={log.comments}
+        errorMessage={errors.comments}
       />
     </>
   );

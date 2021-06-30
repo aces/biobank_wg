@@ -4,7 +4,7 @@ import {get, post} from './helpers.js';
 export function useShipment(initShipment = {}) {
   const [init, setInit] = useState(initShipment);
   const [shipment, setShipment] = useState(new Shipment(init));
-  const [errors, setErrors] = useState({logs: []});
+  const [errors, setErrors] = useState(new Shipment({}));
 
   this.set = (name, value) => setShipment(shipment.set(name, value));
   this.setContainerIds = (value) => this.set('containerIds', value);
@@ -14,17 +14,17 @@ export function useShipment(initShipment = {}) {
   this.remove = (name) => setShipment(shipment.remove(name));
   this.clear = () => {
     setShipment(new Shipment(init));
-    setErrors({logs: []});
+    setErrors(new Shipment({}));
   };
   this.post = async () => await post(shipment, `${loris.BaseURL}/biobank/shipments/`, 'POST')
-    .catch((e) => Promise.reject(setErrors(e)));
+    .catch((e) => Promise.reject(setErrors(new Shipment(e))));
   this.put = async () => await post(shipment, `${loris.BaseURL}/biobank/shipments/`, 'PUT')
     .then((shipments) => {
       setInit(new Shipment(shipments[0]));
       setShipment(new Shipment(shipments[0]));
-      return shipments[0];
+      return shipments;
     })
-    .catch((e) => Promise.reject(setErrors(e)));
+    .catch((e) => Promise.reject(setErrors(new Shipment(e))));
   this.getShipment = () => shipment;
   this.getErrors = () => errors;
 
@@ -84,6 +84,7 @@ class Log {
     this.temperature = props.temperature || null;
     this.date = props.date || null;
     this.time = props.time || null;
+    this.comments = props.comments || null;
   }
 
   set(name, value) {

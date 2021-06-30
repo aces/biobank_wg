@@ -56,7 +56,7 @@ function BiobankFilter({
     />
   );
 
-  const shipmentTab = <ShipmentTab options={options}/>;
+  const shipmentTab = <ShipmentTab data={data} options={options}/>;
 
   const tabInfo = [];
   const tabList = [];

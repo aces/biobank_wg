@@ -66,9 +66,9 @@ class ShipmentHandler
      *
      * @param array $shipmentArray a list of shipment and container arrays to be created.
      *
-     * @return Shipment $shipment a list of shipment objects that were created.
+     * @return array a list of shipment objects that were created.
      */
-    public function createInstance() : Shipment
+    public function createInstance() : array
     {
         $this->validatePermission('create');
         return $this->dao->saveInstance($this->shipment);
@@ -81,15 +81,12 @@ class ShipmentHandler
      *
      * @param array $shipmentArray shipment array to be created
      *
-     * @return \Shipment updated Shipment
+     * @return array a list of shipments objects that were created
      */
-    public function updateInstance(array $shipmentArray) : Shipment
+    public function updateInstance(array $shipmentArray) : array
     {
-        print_r($shipmentArray);
         $this->validatePermission('update');
-        $shipment = new Shipment($shipmentArray);
-        $this->validateInstance($shipment);
-        return $this->dao->saveInstance($shipment);
+        return $this->dao->saveInstance($this->shipment);
     }
 
     /**
@@ -176,6 +173,13 @@ class ShipmentHandler
         if (empty($shipment->barcode)) {
             $error .= 'Barcode is required. ';
         }
+        if (!$shipment->id) {
+            foreach($this->dao->selectInstances() as $shipmentComp) {
+                if ($shipment->barcode === $shipmentComp->barcode) {
+                    $error .= 'A shipment with this Barcode already exists. ';
+                }
+            }
+        }
         if (!empty($error)) {
             $errors['barcode'] = $error;
         }
@@ -245,23 +249,30 @@ class ShipmentHandler
         }
 
         $containerDAO = new ContainerDAO($this->db);
-        // Check that containers are all at the same center.
         $container1 = $containerDAO->getInstanceFromId((int) $shipment->containerIds[0]);
         foreach ($shipment->containerIds as $containerId) {
-            // TODO: Not sure if casting to int should be done here or elsewhere.
             $container = $containerDAO->getInstanceFromId((int) $containerId);
-            if ($container->getCenterID() != $container1->getCenterID()) {
-                $errors[$field] = 'All Containers must be at the same Center.';
-                return $errors;
-            }
 
-            // TODO: Check that containers are not already associated with an active
-            if (!$shipment->getId()) {
-              if (
-              foreach ($container->getShipmentBarcodes() as $shipmentId) {
-                $containerShipment = $this->dao->getInstanceFromBarcode($shipmentId);
+            // TODO: Re-Implement once integrity of Centers of Containers is 
+            // established in CBIGR. Currently, child containers are permitted
+            // at a different site than the parent. This should NOT be the case.
+
+            /* Check that containers are all at the same center.*/
+            // if ($container->getCenterID() != $container1->getCenterID()) {
+            //     $errors[$field] = $container->getBarcode().' and '
+            //     .$container1->getBarcode().' are not at the same Center. All
+            //     Containers must be at the same Center.';
+            //     return $errors;
+            // }
+
+
+            // Check that containers are not already associated with an active
+            // shipment.
+            if (!$shipment->id) {
+              foreach ($container->getShipmentBarcodes() as $shipmentBarcode) {
+                $containerShipment = $this->dao->getInstanceFromBarcode($shipmentBarcode);
                 if ($containerShipment->getActive()) {
-                  $errors[$field] = $containerShipment->getBarcode().' is already
+                  $errors[$field] = $container->getBarcode().' is already
                   associated with an active shipment';
                 }
               };

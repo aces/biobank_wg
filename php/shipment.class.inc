@@ -66,11 +66,11 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Sets the shipment's ID
      *
-     * @param int $id the shipment's ID
+     * @param string $id the shipment's ID
      *
      * @return void
      */
-    private function setId(int $id) : void
+    private function setId(string $id) : void
     {
         $this->id = $id;
     }
@@ -78,9 +78,9 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
     /**
      * Gets the shipment's ID
      *
-     * @return ?int
+     * @return ?string
      */
-    public function getId() : ?int
+    public function getId() : ?string
     {
         return $this->id;
     }
@@ -278,6 +278,7 @@ class Shipment implements \JsonSerializable, \LORIS\Data\DataInstance
                 'destinationCenterId' => $this->destinationCenterId,
                 'containerIds'        => $this->containerIds,
                 'status'              => $this->getStatus(),
+                'active'              => $this->getActive(),
                 'logs'                => $this->logs,
                );
     }

@@ -211,6 +211,7 @@ class ContainerController
         $this->validateTemperature($container);
         $this->validateStatusId($container);
         $this->validateProjectIds($container);
+        $this->validateShipmentBarcoes($container);
         $this->validateCenter($container);
         $this->validateParentContainerId($container);
         $this->validateCoordinate($container);
@@ -410,6 +411,28 @@ class ContainerController
                 }
             }
         }
+    }
+
+    /**
+     * Validates Container Object Shipment Barcodes.
+     *
+     * @param Container $container Container to be checked.
+     *
+     * @throws BadRequest if the provided Container does not meet validation requirements
+     *
+     * @return void
+     */
+    private function validateShipmentBarcodes(Container $container) : void
+    {
+      $shipmentDAO = new ShipmentDAO($this->db);
+      $shipmentsBarcodes = $container->getShipmentBarcodes();
+      foreach($container->getShipmentBarcodes() as $barcode) {
+        $shipment = $shipmentDAO->getInstanceFromBarcode($barcode);
+        if ($shipment->getActive()) {
+          throw new \BadRequest("Container ".$container->getBarcode()." cannot
+          be manipulated while it is associated with an active shipment.");
+        }
+      }
     }
 
     /**

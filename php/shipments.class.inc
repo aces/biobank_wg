@@ -89,16 +89,24 @@ class Shipments implements RequestHandlerInterface
 
         $pathparts = $request->getAttribute('pathparts');
 
-        switch($request->getMethod()) {
-        case 'GET':
-            return $this->_handleGET($request);
-        case 'POST':
-            return $this->_handlePOST($request);
-        case 'PUT':
-            return $this->_handlePUT($request);
-        case 'OPTIONS':
-            return (new \LORIS\Http\Response())
-                ->withHeader('Allow', $this->allowedMethods());
+        // TODO: This entire thing NEEDS to have a try block wrapped around it!
+        try {
+            $this->db->beginTransaction();
+            switch($request->getMethod()) {
+            case 'GET':
+                return $this->_handleGET($request);
+            case 'POST':
+                return $this->_handlePOST($request);
+            case 'PUT':
+                return $this->_handlePUT($request);
+            case 'OPTIONS':
+                return (new \LORIS\Http\Response())
+                    ->withHeader('Allow', $this->allowedMethods());
+            }
+        } finally {
+            if ($this->db->inTransaction()) {
+                $this->db->commit();
+            }
         }
     }
 
@@ -124,21 +132,27 @@ class Shipments implements RequestHandlerInterface
     {
         $shipmentArray   = json_decode($request->getBody()->getContents(), true);
         $shipmentHandler = new ShipmentHandler($shipmentArray, $this->db, $this->user);
+
+        // TODO: A lot of what the handler does should ACTUALLY be done here.
+        // Handlers should not know how operate multiple shipments, only 1 each!
         if (!$shipmentHandler->isValid()) {
             return new \LORIS\Http\Response\JsonResponse($shipmentHandler->getErrors(), 422);
         }
         
-        return new \LORIS\Http\Response\JsonResponse([$shipmentHandler->createInstance()], 200);
+        return new \LORIS\Http\Response\JsonResponse($shipmentHandler->createInstance(), 200);
     }
 
     private function _handlePUT(ServerRequestInterface $request) : ResponseInterface
     {
         $shipmentArray   = json_decode($request->getBody()->getContents(), true);
         $shipmentHandler = new ShipmentHandler($shipmentArray, $this->db, $this->user);
+
+        // TODO: A lot of what the handler does should ACTUALLY be done here.
+        // Handlers should not know how operate multiple shipments, only 1 each!
         if (!$shipmentHandler->isValid()) {
             return new \LORIS\Http\Response\JsonResponse($shipmentHandler->getErrors(), 422);
         }
         
-        return new \LORIS\Http\Response\JsonResponse([$shipmentHandler->createInstance()], 200);
+        return new \LORIS\Http\Response\JsonResponse($shipmentHandler->createInstance(), 200);
     }
 }

@@ -168,6 +168,17 @@ function Globals({
     />
   );
 
+  const shipmentField = () => {
+    if (container.shipmentBarcodes.length !== 0) {
+      return (
+        <InlineField
+          label='Shipment'
+          value={container.shipmentBarcodes.slice(-1)[0]}
+        />
+      );
+    }
+  };
+
   const parentSpecimenField = () => {
     if (specimen.parentSpecimenIds.length > 0) {
       const parentSpecimenBarcodes = Object.values(specimen.parentSpecimenIds)
@@ -294,6 +305,7 @@ function Globals({
       {statusField}
       {projectField}
       {centerField}
+      {shipmentField()}
       {parentSpecimenField()}
       {parentContainerField()}
       {candidateSessionField}
